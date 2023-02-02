@@ -9,8 +9,10 @@ License: `use_mit_license()`
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
+biocViews:
 Imports:
         glmnet (>= 4.1-6),
+        Biobase (>= 2.58.0)
 Depends: 
     R (>= 2.10)
 LazyData: true
