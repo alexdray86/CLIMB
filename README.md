@@ -3,7 +3,7 @@ CLIMB dissects the cellular composition of bulk samples by finding the best comb
 
 ### Download CLIMB
 
-CLIMB package can be installed directly with `devtools::install_github('alexdray86/CLIMB')` from R. It requies GLMNET and Biobase libraries to work. 
+CLIMB package can be installed directly with `devtools::install_github('alexdray86/CLIMB')` from R.
 
 ### Run the example notebook 
 
