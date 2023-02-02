@@ -3,7 +3,7 @@ CLIMB performs bulk deconvolution with the full raw count matrix from scRNA-seq,
 
 ### Download CLIMB
 
-CLIMB package can be installed directly with `devtools::install_github('alexdray86/CLIMB')` from R. It requies GLMNET and Biobase libraries to work. 
+CLIMB package can be installed directly with `devtools::install_github('alexdray86/CLIMB')` from R.
 
 ### Run the example notebook 
 
