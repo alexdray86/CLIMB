@@ -45,7 +45,7 @@ climb <- function(sc, bulk, predict_expression=TRUE, ratio_cancer_cells=NA, up.l
         }
         if(predict_expression){
             pcor_expr_pred = list()
-            all_celltypes = levels(sc$cellType)
+            all_celltypes = unique(sc$cellType)
             pred_exprs = list()
             for(k in 1:length(all_celltypes)){
                 this_ct = all_celltypes[k]
