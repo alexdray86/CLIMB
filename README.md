@@ -1,5 +1,5 @@
 # CLIMB
-CLIMB performs bulk deconvolution with the full raw count matrix from scRNA-seq, fitting coefficients on each single-cells, aggregated at the cell-type level to produce cell-type proportions.
+CLIMB dissects the cellular composition of bulk samples by finding the best combination of single cells using a scRNA-seq dataset as a reference to reconstruct bulk expression from a bulk RNA sequencing target sample. The learned single-cell to bulk sample mapping can then be grouped to obtain cell-subtype proportion estimates, and cell-type gene expression prediction, for each target mixture.
 
 ### Download CLIMB
 
