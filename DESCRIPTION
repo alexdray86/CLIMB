@@ -11,3 +11,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 Imports:
         glmnet (>= 4.1-6)
+        Biobase (>= 2.58.0)
+Depends: 
+    R (>= 2.10)
+LazyData: true
