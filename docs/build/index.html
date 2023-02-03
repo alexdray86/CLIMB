@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Overview of the method &mdash; CLIMB 0.1 documentation</title>
+  <title>Overview of CLIMB method &mdash; CLIMB 0.1 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -61,7 +61,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="#" class="icon icon-home"></a></li>
-      <li class="breadcrumb-item active">Overview of the method</li>
+      <li class="breadcrumb-item active">Overview of CLIMB method</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -81,11 +81,11 @@
 <li class="toctree-l1"><a class="reference internal" href="usage/results.html">Examples of CLIMB results</a></li>
 </ul>
 </div>
-<section id="overview-of-the-method">
-<h1>Overview of the method<a class="headerlink" href="#overview-of-the-method" title="Permalink to this heading"></a></h1>
-<p><strong>CLIMB</strong> dissects the cellular composition and the cellular expression of bulk samples by finding the best combination of single cells using a scRNA-seq dataset as a reference to reconstruct bulk expression using bulk RNA sequencing target sample. The learned single-cell to bulk sample mapping can then be grouped to obtain cell-subtype abundance and cell-subtype expression.</p>
+<section id="overview-of-climb-method">
+<h1>Overview of CLIMB method<a class="headerlink" href="#overview-of-climb-method" title="Permalink to this heading"></a></h1>
+<p><strong>CLIMB</strong> employs an innovative computational approach to unravel the cellular composition and expression patterns of bulk samples, utilizing a reference scRNA-seq dataset as a guide for reconstructing bulk expression. The resultant single-cell to bulk sample mapping is used to deconvolute bulk samples into cell-subtype abundance and cell-subtype expression, providing valuable insight into the underlying cellular heterogeneity of the samples.</p>
 <img alt="_images/CLIMB_sketch1.png" src="_images/CLIMB_sketch1.png" />
-<p><strong>CLIMB</strong> relies on a linear regression model. Its novelty come from avoiding to rely on signature matrix to perform bulk deconvolution. It indeed fit coefficients at the single-cell level before grouping it at cell-type level. See in more details <strong>CLIMB</strong> method in <a class="reference internal" href="usage/detailmethods.html#detailmethods"><span class="std std-ref">CLIMB method</span></a>.</p>
+<p><strong>CLIMB</strong> differentiates itself from other methods by not relying on a signature matrix for bulk deconvolution. Instead, it fits coefficients at the single-cell level and then aggregates them at the cell-type level. For further information on the CLIMB method, see <cite>CLIMB method</cite> section.</p>
 </section>
 
 

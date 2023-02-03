@@ -3,7 +3,7 @@
 CLIMB method
 ________________
 
-CLIMB method proposes an innovative approach to solve a bulk deconvolution problem. Instead of fitting coefficients for each cell-type using a signature matrix (e.g. cell-type average expression), CLIMB fits coefficients :math:`\alpha_{i}` for each single-cell :math:`i`, to find the best linear combination of single-cell expression vector :math:`c_i` to predict bulk expression vector :math:`\mathbf{x}_n`. Thus, we use the relation :math:`\mathbf{x}_n \sim \mathbf{C} \cdot \boldsymbol{\alpha}_n`, shown below in more details :
+CLIMB method proposes an innovative approach to solve a bulk deconvolution problem. Unlike conventional methods that fit coefficients for each cell-type based on a signature matrix (e.g., cell-type average expression), CLIMB fits coefficients, denoted as :math:`\alpha_{i}`, for each individual single-cell :math:`i`, with the goal of finding the optimal linear combination of single-cell expression vectors :math:`c_i` that can predict the bulk expression vector :math:`\mathbf{x}_n`. Thus, their relationship is defined by :math:`\mathbf{x}_n \sim \mathbf{C} \cdot \boldsymbol{\alpha}_n`, shown below in more details:
 
 .. math:: \begin{bmatrix}
         x_{n1} \\
@@ -23,23 +23,19 @@ CLIMB method proposes an innovative approach to solve a bulk deconvolution probl
         \alpha_n^C
     \end{bmatrix}
 
-where the vector :math:`\mathbf{x}_n` represent the bulk expression matrix for a mixture :math:`n`, :math:`\mathbf{C}` is the raw counts matrix from scRNA-seq, and :math:`\boldsymbol{\alpha}_n` is the vector of coefficients fitted for each single-cell :math:`c` for a given mixture :math:`n` with GLMNET library. 
-
-We then group and normalize these coefficients :math:`\alpha_{ni}` at the cell-subtype level to obtain the cell-subtype proportions :math:`w_{nk}` for each cell-subtype :math:`k` and mixture :math:`n` :
-
-.. math:: w_{nk} = \frac{\sum_{i=1}^{C} \tau_{ki} \cdot \alpha_{ni} / \theta_i }{\sum_{i=1}^{C} \alpha_{ni} / \theta_i }
-
-where :math:`\boldsymbol{\tau}_k` is an indicator vector of length :math:`C` and equal to 1 whenever cell :math:`i` is of type :math:`k`. 
-
-Thus, CLIMB loss function is defined by :
+where the vector :math:`\mathbf{x}_n` represent the bulk expression matrix for a mixture :math:`n`, :math:`\mathbf{C}` is the raw counts matrix from scRNA-seq, and :math:`\boldsymbol{\alpha}_n` is the vector of coefficients fitted for each single-cell :math:`c` for a given mixture :math:`n`. The coefficients :math:`\alpha_i` are fitted with `glmnet` library with a non-negativity constraint on the coefficients, and no regularization. Thus, CLIMB loss function is defined by :
 
 .. math:: L(\boldsymbol{\alpha}_n \vert \mathbf{C}, \mathbf{x}_n ) =  \min\limits_{\boldsymbol{\alpha}} \frac{1}{2G} \left\vert \mathbf{x}_n - \mathbf{C} \cdot \boldsymbol{\alpha}_n \right\vert^2 \;\;\text{, with}\;\; \alpha_{ni} \in [0,+\infty]
 
-Thus, we impose a non-negativity constraint on the coefficients, and no regularization.
+We then group and normalize :math:`\alpha_{ni}` coefficients at the cell-subtype level to obtain the cell-subtype proportions :math:`w_{nk}` for each cell-subtype :math:`k` and mixture :math:`n` :
+
+.. math:: w_{nk} = \frac{\sum_{i=1}^{C} \tau_{ki} \cdot \alpha_{ni} / \theta_i }{\sum_{i=1}^{C} \alpha_{ni} / \theta_i }
+
+where :math:`\boldsymbol{\tau}_k` is an indicator vector of length :math:`C` and equal to 1 whenever cell :math:`i` is of type :math:`k`, and :math:`\theta_i` denotes the total expression (e.g., the sum of RNA counts) in cell :math:`i`. 
 
 **CLIMB-BA extension**
 
-In the context of Acute Myeloid Leukemia, blast count is a routinely measured metric in the clinics. It provides an accurate estimation of cancer cell proportions in a given mixture, as shown by Van Galen et al. First, we introduce a variable for measure blast count in a sample :math:`n`, :math:`b_n`. Then, we introduce the estimated proportion of cancer cells through bulk deconvolution. The cancer cell proportion is the sum of the proportion of each cancer cell subtype :
+In the context of Acute Myeloid Leukemia, blast count is a commonly used metric in clinical practice and has been demonstrated to provide an accurate estimation of the proportion of cancer cells in a given mixture, as documented by Van Galen et al. In this work, we introduce a variable, denoted as :math:`b_n`, to quantify the blast count in sample :math:`n`. Additionally, we present an estimate of the cancer cell proportion through bulk deconvolution, defined as the sum of the proportions of each cancer cell subtype.
 
 .. math:: \hat{b}_n = \sum_{k \in \kappa} w_{nk}
 

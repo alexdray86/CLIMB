@@ -14,11 +14,11 @@
    usage/detailmethods.rst
    usage/results.rst
    
-Overview of the method
+Overview of CLIMB method
 =======================
 
-**CLIMB** dissects the cellular composition and the cellular expression of bulk samples by finding the best combination of single cells using a scRNA-seq dataset as a reference to reconstruct bulk expression using bulk RNA sequencing target sample. The learned single-cell to bulk sample mapping can then be grouped to obtain cell-subtype abundance and cell-subtype expression.
+**CLIMB** employs an innovative computational approach to unravel the cellular composition and expression patterns of bulk samples, utilizing a reference scRNA-seq dataset as a guide for reconstructing bulk expression. The resultant single-cell to bulk sample mapping is used to deconvolute bulk samples into cell-subtype abundance and cell-subtype expression, providing valuable insight into the underlying cellular heterogeneity of the samples.
 
 .. image:: images/CLIMB_sketch1.png
 
-**CLIMB** relies on a linear regression model. Its novelty come from avoiding to rely on signature matrix to perform bulk deconvolution. It indeed fit coefficients at the single-cell level before grouping it at cell-type level. See in more details **CLIMB** method in :ref:`detailmethods`.
+**CLIMB** differentiates itself from other methods by not relying on a signature matrix for bulk deconvolution. Instead, it fits coefficients at the single-cell level and then aggregates them at the cell-type level. For further information on the CLIMB method, see `CLIMB method` section.

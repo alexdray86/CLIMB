@@ -6,4 +6,9 @@ pip install sphinx_rtd_theme # install good looking theme
 
 # 2) Activate github pages on git, for the folder ./docs
 
-# 3) rename all folder to remove trailing '_'. e.g. _build -> build 
+# 3) rename all folder to remove trailing '_'. e.g. _build -> build
+
+###
+# Alternative :
+sphinx-build -b html . build
+# and then remove build/html
