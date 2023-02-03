@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CLIMB method &mdash; CLIMB 0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Examples of CLIFF results" href="results.html" />
+    <link rel="prev" title="Execution" href="execution.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html">
+            <img src="../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="execution.html">Execution</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">CLIMB method</a></li>
+<li class="toctree-l1"><a class="reference internal" href="results.html">Examples of CLIFF results</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CLIMB</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a></li>
+      <li class="breadcrumb-item active">CLIMB method</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/usage/detailmethods.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="climb-method">
+<span id="detailmethods"></span><h1>CLIMB method<a class="headerlink" href="#climb-method" title="Permalink to this heading"></a></h1>
+<p>CLIMB method proposes an innovative approach to solve a bulk deconvolution problem. Instead of fitting coefficients for each cell-type using a signature matrix (e.g. cell-type average expression), CLIMB fits coefficients <span class="math notranslate nohighlight">\(\alpha_{i}\)</span> for each single-cell <span class="math notranslate nohighlight">\(i\)</span>, to find the best linear combination of single-cell expression vector <span class="math notranslate nohighlight">\(c_i\)</span> to predict bulk expression vector <span class="math notranslate nohighlight">\(\mathbf{x}_n\)</span>. Thus, we use the relation <span class="math notranslate nohighlight">\(\mathbf{x}_n \sim \mathbf{C} \cdot \boldsymbol{\alpha}_n\)</span>, shown below in more details :</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{bmatrix}
+    x_{n1} \\
+    \vdots \\
+    x_{nG}
+\end{bmatrix}
+\propto
+\underbrace{ \begin{bmatrix}
+    c_1^1 &amp; ... &amp; c_1^C \\
+    \vdots &amp; \ddots &amp; \vdots \\
+    c_G^1 &amp; ... &amp; c_G^C
+\end{bmatrix} }_{ \text{ $\mathbf{C}^{(G \times C)}$ } }
+\cdot
+\begin{bmatrix}
+    \alpha_n^1 \\
+    \vdots \\
+    \alpha_n^C
+\end{bmatrix}\end{split}\]</div>
+<p>where the vector <span class="math notranslate nohighlight">\(\mathbf{x}_n\)</span> represent the bulk expression matrix for a mixture <span class="math notranslate nohighlight">\(n\)</span>, <span class="math notranslate nohighlight">\(\mathbf{C}\)</span> is the raw counts matrix from scRNA-seq, and <span class="math notranslate nohighlight">\(\boldsymbol{\alpha}_n\)</span> is the vector of coefficients fitted for each single-cell <span class="math notranslate nohighlight">\(c\)</span> for a given mixture <span class="math notranslate nohighlight">\(n\)</span> with GLMNET library.</p>
+<p>We then group and normalize these coefficients <span class="math notranslate nohighlight">\(\alpha_{ni}\)</span> at the cell-subtype level to obtain the cell-subtype proportions <span class="math notranslate nohighlight">\(w_{nk}\)</span> for each cell-subtype <span class="math notranslate nohighlight">\(k\)</span> and mixture <span class="math notranslate nohighlight">\(n\)</span> :</p>
+<div class="math notranslate nohighlight">
+\[w_{nk} = \frac{\sum_{i=1}^{C} \tau_{ki} \cdot \alpha_{ni} / \theta_i }{\sum_{i=1}^{C} \alpha_{ni} / \theta_i }\]</div>
+<p>where <span class="math notranslate nohighlight">\(\boldsymbol{\tau}_k\)</span> is an indicator vector of length <span class="math notranslate nohighlight">\(C\)</span> and equal to 1 whenever cell <span class="math notranslate nohighlight">\(i\)</span> is of type <span class="math notranslate nohighlight">\(k\)</span>.</p>
+<p>Thus, CLIMB loss function is defined by :</p>
+<div class="math notranslate nohighlight">
+\[L(\boldsymbol{\alpha}_n \vert \mathbf{C}, \mathbf{x}_n ) =  \min\limits_{\boldsymbol{\alpha}} \frac{1}{2G} \left\vert \mathbf{x}_n - \mathbf{C} \cdot \boldsymbol{\alpha}_n \right\vert^2 \;\;\text{, with}\;\; \alpha_{ni} \in [0,+\infty]\]</div>
+<p>Thus, we impose a non-negativity constraint on the coefficients, and no regularization.</p>
+<p><strong>CLIMB-BA extension</strong></p>
+<p>In the context of Acute Myeloid Leukemia, blast count is a routinely measured metric in the clinics. It provides an accurate estimation of cancer cell proportions in a given mixture, as shown by Van Galen et al. First, we introduce a variable for measure blast count in a sample <span class="math notranslate nohighlight">\(n\)</span>, <span class="math notranslate nohighlight">\(b_n\)</span>. Then, we introduce the estimated proportion of cancer cells through bulk deconvolution. The cancer cell proportion is the sum of the proportion of each cancer cell subtype :</p>
+<div class="math notranslate nohighlight">
+\[\hat{b}_n = \sum_{k \in \kappa} w_{nk}\]</div>
+<p>If we expect this proportion to be more precise than the estimation given by bulk deconvolution alone, cancer cell proportion can be normalized with the following approach :</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}w_{nk}^*=
+   \begin{cases}
+   w_{nk}  \; \frac{b_n + \epsilon}{\hat{b}_n + \epsilon},&amp; \text{if } \;\; k \in \kappa\\
+   w_{nk} \; \frac{1 - b_n + \epsilon}{1 - \hat{b}_n + \epsilon},  &amp; \text{otherwise}
+   \end{cases}\end{split}\]</div>
+<p>with <span class="math notranslate nohighlight">\(b_n\)</span> being the blast count for a mixture <span class="math notranslate nohighlight">\(n\)</span>, and <span class="math notranslate nohighlight">\(\hat{b}_n\)</span> the cancer cell proportion estimated with CLIMB bulk deconvolution. <span class="math notranslate nohighlight">\(\epsilon\)</span> is a constant factor that prevents division by zero. By modulating <span class="math notranslate nohighlight">\(\epsilon\)</span>, the strength of the normalization can be controled, with the two following extreme situations :</p>
+<div class="math notranslate nohighlight">
+\[w^*_{nk} \to w_{nk} \frac{b_n}{\hat{b}_n} \;\;, \;\; \text{if } \;\; \epsilon \to 0\]</div>
+<div class="math notranslate nohighlight">
+\[w^*_{nk} \to w_{nk} \;\;, \;\; \text{if } \;\; \epsilon \to \infty\]</div>
+<p>respectively <span class="math notranslate nohighlight">\(w^*_{nk} \to w_{nk} (1 - b_n) / (1-\hat{b}_n)\)</span>, if <span class="math notranslate nohighlight">\(\epsilon \to 0\)</span> and <span class="math notranslate nohighlight">\(w^*_{nk} \to w_{nk}\)</span> if <span class="math notranslate nohighlight">\(\epsilon \to \infty\)</span>, for normal cell subtypes. By increasing <span class="math notranslate nohighlight">\(\epsilon\)</span> we are doing a smooth normalization that turned out to be beneficial when <span class="math notranslate nohighlight">\(\epsilon=1\)</span>.</p>
+<p>Note that we also tried to correct cancer cell-subtype proportions through a regularization penalty term but the latter was not able to reach better precision than the approach described here. As a simple normalization is easier to implement and faster to compute, we decided to choose this approach.</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="execution.html" class="btn btn-neutral float-left" title="Execution" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="results.html" class="btn btn-neutral float-right" title="Examples of CLIFF results" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Coudray Alexandre, Trono / La Manno research group at EPFL.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile)*/
+    .wy-side-nav-search, .wy-nav-top {
+      background: #343131;
+    }
+    a:visited {
+        color: #ab0707;
+    }
+    .wy-menu-vertical a { color: white; }
+  </style>
+
+
+</body>
+</html>

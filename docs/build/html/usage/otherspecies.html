@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Working with other species &mdash; Cliff 0.6 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Analysis example" href="analysis_ex.html" />
+    <link rel="prev" title="Using a genome subset" href="genome_subset.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html">
+            <img src="../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="execution.html">Execution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="output.html">Output</a></li>
+<li class="toctree-l1"><a class="reference internal" href="detailmethods.html">Detailed methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="genome_subset.html">Using a genome subset</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Working with other species</a></li>
+<li class="toctree-l1"><a class="reference internal" href="analysis_ex.html">Analysis example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../source/pyTEnrich.html">pyTEnrich class &amp; functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Cliff</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a></li>
+      <li class="breadcrumb-item active">Working with other species</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/usage/otherspecies.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="working-with-other-species">
+<h1>Working with other species<a class="headerlink" href="#working-with-other-species" title="Permalink to this heading"></a></h1>
+<p><em>pyTEnrich</em> has been developed to be used with hg19 genome. If you wish to use it with another genome, you will have to prepare the input TE database with a proper format and make new associated summaries with provided perl script.</p>
+<p>Exemple for species danRer10 :</p>
+<ol class="arabic simple">
+<li><p>Download TE database from RepeatMasker</p></li>
+</ol>
+<p>2. Convert .fa.out file with utils/convert_repeatMasker.sh
+<code class="docutils literal notranslate"><span class="pre">utils/convert_repeatMasker.sh</span> <span class="pre">danRer10.fa.out</span> <span class="pre">&gt;</span> <span class="pre">db/danRer10.bed</span></code></p>
+<p>3. Remove unwanted repeats :
+<code class="docutils literal notranslate"><span class="pre">grep</span> <span class="pre">-v</span> <span class="pre">'Low_complexity\|Satellite\|Simple_repeat\|Unknown'</span> <span class="pre">db/danRer10.bed</span> <span class="pre">&gt;</span> <span class="pre">db/danRer10_TEs.bed</span></code></p>
+<ol class="arabic simple" start="4">
+<li><dl class="simple">
+<dt>Use utils/make_ref_TE.pl to make files needed by pyTEnrich</dt><dd><p>INDEX is the col number of the desired feature (subfam/fam)</p>
+</dd>
+</dl>
+</li>
+</ol>
+<p><em>class/families should always be in field 6 (0-based)</em>
+<code class="docutils literal notranslate"><span class="pre">utils/make_ref_TE.pl</span> <span class="pre">--file</span> <span class="pre">db/danRer10_TEs.bed</span> <span class="pre">--index</span> <span class="pre">6</span> <span class="pre">&gt;</span> <span class="pre">db/danRer10_Fam_ref_TE.txt</span></code></p>
+<p><em>subfam should always be in field 7 (0-based)</em>
+<code class="docutils literal notranslate"><span class="pre">utils/make_ref_TE.pl</span> <span class="pre">--file</span> <span class="pre">db/danRer10_TEs.bed</span> <span class="pre">--index</span> <span class="pre">7</span> <span class="pre">&gt;</span> <span class="pre">db/danRer10_Subfam_ref_TE.txt</span></code></p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="genome_subset.html" class="btn btn-neutral float-left" title="Using a genome subset" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="analysis_ex.html" class="btn btn-neutral float-right" title="Analysis example" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Coudray Alexandre, Trono / La Manno research group at EPFL.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
