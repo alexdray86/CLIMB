@@ -69,7 +69,7 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
         alpha_overal = do.call(rbind,save_coefs)
         alpha_cancer = do.call(rbind,save_coefs)[,cancer_sel]
         sc.cancer = sc[,cancer_sel]
-        C_overal = exprs(sc.ref)
+        C_overal = exprs(sc)
         Y_hat_overal = alpha_overal %*% t(C_overal)
         Y_true_bulk  = t(exprs(bulk))
         Epsilon_ng = Y_true_bulk - Y_hat_overal
