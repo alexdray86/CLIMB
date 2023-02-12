@@ -11,7 +11,7 @@
 #' @param norm_factor if ratio_cancer_cells is provided, indicate strength of smooth normalization
 #' @param cancer_pattern a string pattern present in all cancer cell-type. Only for these cell-types CLIMB will assume the presence of differentially expressed genes
 #' @export
-climb <- function(sc, bulk, predict_expression=TRUE, ratio_cancer_cells=NA, up.lim=Inf, lambda=0, norm_factor=0.1){
+climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, ratio_cancer_cells=NA, up.lim=Inf, lambda=0, norm_factor=0.1){
     N = dim(bulk)[2] ; G = dim(bulk)[1] ; K = length(unique(sc$cellType))
     ct.props = list() ; ct.exprs = list()
     sc.mat = exprs(sc)
