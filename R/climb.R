@@ -12,11 +12,12 @@
 #' @param cancer_pattern a string pattern present in all cancer cell-type. Only for these cell-types CLIMB will assume the presence of differentially expressed genes
 #' @export
 climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, ratio_cancer_cells=NA, up.lim=Inf, lambda=0, norm_factor=0.1){
-    N = dim(bulk)[2] ; G = dim(bulk)[1] ; K = length(unique(sc$cellType))
     ct.props = list() ; ct.exprs = list()
     sc.mat = exprs(sc)
     cell_expr = colSums(exprs(sc))
     save_coefs = list() ; save_ncoefs = list()
+    cellTypes = levels(sc$cellType)
+    N = dim(bulk)[2] ; G = dim(bulk)[1] ; K = length(cellTypes)
     for(i in 1:N){
         y = num(exprs(bulk)[,i])
         fit = glmnet(sc.mat, y, lower.limits = 0.0, upper.limits = up.lim, lambda = lambda)
@@ -63,9 +64,9 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
         save_ncoefs[[i]] = norm_coefs
     }
     climb.prop = do.call(rbind,ct.props)
-    if(predict_expression && any(grepl(cancer_pattern, unique(sc$cellType)))){
+    if(predict_expression && any(grepl(cancer_pattern, cellTypes))){
         normal_sel = !grepl(cancer_pattern,sc$cellType) ; cancer_sel = grepl(cancer_pattern,sc$cellType)
-        cancer_ct_sel = grepl(cancer_pattern,unique(sc$cellType))
+        cancer_ct_sel = grepl(cancer_pattern,cellTypes)
         alpha_overal = do.call(rbind,save_coefs)
         alpha_cancer = do.call(rbind,save_coefs)[,cancer_sel]
         sc.cancer = sc[,cancer_sel]
@@ -97,14 +98,14 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
         }
         dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
         dimnames(S_pred_n)[[2]] = dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
-        dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = unique(sc$cellType)
+        dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
         final_res = list(as.matrix(climb.prop), S_pred_n, S_pred_mapping_n, save_coefs, save_ncoefs)
         names(final_res) = c('props', 'expr.pred', 'expr.mapping', 'coefs', 'coefs.norm')
         return(final_res)
     } else if (predict_expression) {
         dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
         dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
-        dimnames(S_pred_mapping_n)[[3]] = unique(sc$cellType)
+        dimnames(S_pred_mapping_n)[[3]] = cellTypes
         final_res = list(as.matrix(climb.prop), S_pred_mapping_n, save_coefs, save_ncoefs)
         names(final_res) = c('props', 'expr.mapping', 'coefs', 'coefs.norm')
         return(final_res)
