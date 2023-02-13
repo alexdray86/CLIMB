@@ -18,6 +18,7 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
     save_coefs = list() ; save_ncoefs = list()
     cellTypes = levels(sc$cellType)
     N = dim(bulk)[2] ; G = dim(bulk)[1] ; K = length(cellTypes)
+    display('Bulk to single-cell mapping for prediction of cell-type abundance')
     for(i in 1:N){
         y = num(exprs(bulk)[,i])
         fit = glmnet(sc.mat, y, lower.limits = 0.0, upper.limits = up.lim, lambda = lambda)
@@ -64,7 +65,9 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
         save_ncoefs[[i]] = norm_coefs
     }
     climb.prop = do.call(rbind,ct.props)
+    display('Cell-type abundance done. ')
     if(predict_expression && any(grepl(cancer_pattern, cellTypes))){
+        display('Starting high-resolution expression deconvolution')
         normal_sel = !grepl(cancer_pattern,sc$cellType) ; cancer_sel = grepl(cancer_pattern,sc$cellType)
         cancer_ct_sel = grepl(cancer_pattern,cellTypes)
         alpha_overal = do.call(rbind,save_coefs)
@@ -94,6 +97,9 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
                 } 
             } else {
                 S_pred_n[n,g,] = rep(0,K)
+            }
+            if( g %% 1000 == 0){
+                display(paste0('High-Resolution expression prediction: ', g, ' genes processed...'))
             }
         }
         dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
