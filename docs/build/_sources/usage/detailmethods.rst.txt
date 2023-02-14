@@ -3,6 +3,8 @@
 CLIMB method
 ________________
 
+**CLIMB deconvolution for cell-type abundance prediction**
+
 CLIMB method proposes an innovative approach to solve a bulk deconvolution problem. Unlike conventional methods that fit coefficients for each cell-type based on a signature matrix (e.g., cell-type average expression), CLIMB fits coefficients, denoted as :math:`\alpha_{i}`, for each individual single-cell :math:`i`, with the goal of finding the optimal linear combination of single-cell expression vectors :math:`c_i` that can predict the bulk expression vector :math:`\mathbf{x}_n`. Thus, their relationship is defined by :math:`\mathbf{x}_n \sim \mathbf{C} \cdot \boldsymbol{\alpha}_n`, shown below in more details:
 
 .. math:: \begin{bmatrix}
@@ -32,6 +34,32 @@ We then group and normalize :math:`\alpha_{ni}` coefficients at the cell-subtype
 .. math:: w_{nk} = \frac{\sum_{i=1}^{C} \tau_{ki} \cdot \alpha_{ni} / \theta_i }{\sum_{i=1}^{C} \alpha_{ni} / \theta_i }
 
 where :math:`\boldsymbol{\tau}_k` is an indicator vector of length :math:`C` and equal to 1 whenever cell :math:`i` is of type :math:`k`, and :math:`\theta_i` denotes the total expression (e.g., the sum of RNA counts) in cell :math:`i`. 
+
+**CLIMB deconvolution of bulk expression into cell-type expression** 
+
+CLIMB allows the prediction of cancer cell expression in a two step manner. Let first define our target *high-resolution* expression :math:`\hat{\mathbf{S}}_{(ngk)}`, which is the cell-type-specific and bulk sample-specific expression for each cell-type :math:`k`. We assume that for a given group of samples, the *grouped* expression :math:`\hat{\mathbf{S}}_{(gk)}` relates to the *high-resolution* expression with the following formula:`
+
+.. math:: s_{gk}^{(grouped)} = \frac{1}{N} \sum_{n=1}^N s_{ngk}^{(high-res)}
+
+First, we take advantage of the bulk to single-cell mapping to directly derive the cell-type expression from the bulk-to-single-cell deconvolution or *mapping*. We can simply sum up the expression of cells mapped by CLIMB to get a *high-resolution* cell-type-specific and bulk-specific expression :math:`s_{ngk*^{(mapping)*`:
+
+.. math:: s_{ngk}^{(mapping)} = \sum_{i=1}^C \alpha_{in} \cdot c_{ig} \cdot \tau_{ik}
+
+with :math:`\alpha_{in}` being the coefficient fitted by GLMNET on each single-cell, linking each cell :math:`i` to each bulk :math:`n`. :math:`c_{ig}` denotes the single-cell expression of cell :math:`i` and gene :math:`g`, and  :math:`\tau_{ik}` is an indicator vector equal to 1 if cell :math:`i` is of type :math:`k`.
+
+Although this is potentially sufficient in cases where scRNA-seq reference dataset maps all cell states present in bulk samples, it can be insufficient to detect genes deferentially-expressed (DE) at cell-type level. As DE genes will likely induce error on the cell-type expression deconvolution, we use the error itself to fit our model. We can also make the reasonable assumption that DE genes only originates in cancer cells. Thus, for a given gene :math:`g` and a given bulk :math:`n`, we have:
+
+.. math:: y_{ng} \sim \hat{y}_{ng}^{(mapping)} + \epsilon_{ng} \;\;\; \rightarrow \;\;\; y_{ng} - \hat{y}_{ng}^{(mapping)} = \epsilon_{ng}
+
+Thus, we use :math:`\epsilon_{ng} = y_{ng} - \hat{y}_{ng}^{(mapping)}` as input for a model to predict cancer cell-type expression. We decompose our error :math:`\epsilon_{ng}` between the error originated from DE genes :math:`\epsilon_{ng}^{(DE)}`, and an additional error term :math:`\epsilon_{ng}^*`. Similar as other methods [ref, ref], we use the information from all bulk samples :math:`N` to deconvolute the high-resolution cell-type specific expression :math:`\hat{s}_{ngk}^{(DE)}`. We consider that :math:`\epsilon_{ng}^{(DE)}` only originates from cancer cells :math:`C^{(C)}` of type :math:`K^{(C)}`, thus
+
+.. math:: \epsilon_{ng} \sim \underbrace{\sum_{k=1}^{K^{(C)}} \left( w_{nk} \cdot \hat{s}_{ngk}^{(DE)} \right)}_{\epsilon_{ng}^{(DE)}} + \; \epsilon_{ng}^* = \sum_{i=1}^{C^{(C)}} \left( \alpha_{in} \cdot \hat{c}_{ig} \right) + \epsilon_{ng}^* = \mathbf{A} \cdot \hat{\mathbf{c}}_g + \epsilon_{ng}^*
+
+Where :math:`\hat{\mathbf{c}}_g` is the vector of coefficients we wish to predict. Our final prediction of cell-type expresion for a cancer cell-type :math:`k`, a given bulk :math:`n`, and a given gene :math:`g` is:
+
+.. math:: \hat{s}_{ngk}^{(high-res)} = \underbrace{\hat{s}_{ngk}^{(mapping)}}_{\text{from scRNA-seq}} + \underbrace{\hat{s}_{ngk}^{(DE)}}_{\text{learned}} = \sum_{i=1}^C \alpha_{in} \cdot ( c_{ig} + \hat{c}_{ig} ) \cdot \tau_{ik}
+
+Following the assumptions made above, we set :math:`\hat{c}_{ig}` to zero for normal cells, which imply that :math:`\hat{s}_{ngk}^{(high-res)} = \hat{s}_{ngk}^{(mapping)}` for normal cell types.
 
 **CLIMB-BA extension**
 

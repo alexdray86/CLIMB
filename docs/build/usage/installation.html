@@ -21,7 +21,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Execution" href="execution.html" />
-    <link rel="prev" title="Overview of the method" href="../index.html" /> 
+    <link rel="prev" title="Overview of CLIMB method" href="../index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -44,8 +44,8 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="execution.html">Execution</a></li>
-<li class="toctree-l1"><a class="reference internal" href="detailmethods.html">Detailed methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="results.html">Examples of CLIFF results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="detailmethods.html">CLIMB method</a></li>
+<li class="toctree-l1"><a class="reference internal" href="results.html">Examples of CLIMB results</a></li>
 </ul>
 
         </div>
@@ -76,12 +76,18 @@
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this heading"></a></h1>
 <p><strong>Install CLIMB from R</strong></p>
 <p>From R, you can use devtools to directly install <strong>CLIMB</strong> with the following command:</p>
-<p><code class="docutils literal notranslate"><span class="pre">devtools::install_github('alexdray86/CLIMB')</span></code></p>
+<div class="highlight-R notranslate"><div class="highlight"><pre><span></span><span class="n">devtools</span><span class="o">::</span><span class="nf">install_github</span><span class="p">(</span><span class="s">&#39;alexdray86/CLIMB&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
 <p>In R, you will need two libraries, GLMNET and Biobase. GLMNET is used to optimize our linear regression model, and Biobase is used for the <cite>ExpressionSet</cite> format, that is used as input for CLIMB (same as for MUSIC method). Both method should be installed automatically upon CLIMB installation. You will still need to load them in R before being able to use CLIMB. Thus, you will have to load the following libraries in R :</p>
-<p><code class="docutils literal notranslate"><span class="pre">library(climb)</span> <span class="pre">;</span> <span class="pre">library(glmnet)</span> <span class="pre">;</span> <span class="pre">library(Biobase)</span></code></p>
+<div class="highlight-R notranslate"><div class="highlight"><pre><span></span><span class="nf">library</span><span class="p">(</span><span class="n">climb</span><span class="p">)</span> <span class="p">;</span> <span class="nf">library</span><span class="p">(</span><span class="n">glmnet</span><span class="p">)</span> <span class="p">;</span> <span class="nf">library</span><span class="p">(</span><span class="n">Biobase</span><span class="p">)</span>
+</pre></div>
+</div>
 <p><strong>Install CLIMB from GitHub</strong></p>
 <p>Similarly, you can git clone our GitHub repository with the following command :</p>
-<p><code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">clone</span> <span class="pre">https://github.com/alexdray86/CLIMB.git</span></code></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/alexdray86/CLIMB.git
+</pre></div>
+</div>
 <p>For running CLIMB the first time, we advice to run the example notebook with mock data provided in the GitHub repository above.</p>
 <p>Enjoy !</p>
 </section>
@@ -90,7 +96,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../index.html" class="btn btn-neutral float-left" title="Overview of the method" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../index.html" class="btn btn-neutral float-left" title="Overview of CLIMB method" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="execution.html" class="btn btn-neutral float-right" title="Execution" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

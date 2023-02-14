@@ -20,7 +20,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Detailed methods" href="detailmethods.html" />
+    <link rel="next" title="CLIMB method" href="detailmethods.html" />
     <link rel="prev" title="Installation" href="installation.html" /> 
 </head>
 
@@ -44,8 +44,8 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Execution</a></li>
-<li class="toctree-l1"><a class="reference internal" href="detailmethods.html">Detailed methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="results.html">Examples of CLIFF results</a></li>
+<li class="toctree-l1"><a class="reference internal" href="detailmethods.html">CLIMB method</a></li>
+<li class="toctree-l1"><a class="reference internal" href="results.html">Examples of CLIMB results</a></li>
 </ul>
 
         </div>
@@ -74,13 +74,33 @@
              
   <section id="execution">
 <h1>Execution<a class="headerlink" href="#execution" title="Permalink to this heading"></a></h1>
-<p><strong>Run CLIMB</strong></p>
-<p>The easiest is to use a jupyter notebook at the root of CLIMB folder and load all functions as shown in <cite>cliff_example_invitro.ipynb</cite>:</p>
-<p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">cliff.Cliff</span> <span class="pre">import</span> <span class="pre">Cliff,</span> <span class="pre">Cliff_CV</span></code></p>
-<p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">cliff.DataContainer</span> <span class="pre">import</span> <span class="pre">DataContainer</span></code></p>
-<p><code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">cliff.utils</span> <span class="pre">import</span> <span class="pre">sigmoid,</span> <span class="pre">rmse</span></code></p>
-<p>don’t forget to import all required libraries.</p>
-<p>For help about input / output of cliff functions, visit the class/function page.</p>
+<p><strong>Load CLIMB package</strong></p>
+<p>Once CLIMB is installed, you should load CLIMB into your R environment with :</p>
+<div class="highlight-R notranslate"><div class="highlight"><pre><span></span><span class="nf">library</span><span class="p">(</span><span class="n">climb</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Generating input objects for CLIMB</strong></p>
+<p>To be able to use CLIMB, you need to create two <strong>ExpressionSet</strong> object (requires <strong>Biobase</strong> package), with the same shape as requested by MUSIC or BisqueRNA method [ref, ref]. You will need one <strong>ExpressionSet</strong> for your scRNA-seq reference dataset, containing genes as row and cells as columns, with the cell type labels named <strong>cellType</strong>. Similarly, your bulk data should be given as an <strong>ExpressionSet</strong> object, with genes as rows and mixtures as columns. Hereafter, an example to build the <strong>ExpressionSet</strong> object from R matrices:</p>
+<div class="highlight-R notranslate"><div class="highlight"><pre><span></span><span class="nf">library</span><span class="p">(</span><span class="n">climb</span><span class="p">)</span> <span class="p">;</span> <span class="nf">library</span><span class="p">(</span><span class="n">Biobase</span><span class="p">)</span>
+<span class="n">scRNA.es</span> <span class="o">=</span> <span class="nf">ExpressionSet</span><span class="p">(</span><span class="n">scRNAseq_count_matrix</span><span class="p">)</span>
+<span class="n">scRNA.es</span><span class="o">$</span><span class="n">cellType</span> <span class="o">=</span> <span class="n">celltype_labels_vector</span>
+<span class="n">bulk.es</span> <span class="o">=</span> <span class="nf">ExpressionSet</span><span class="p">(</span><span class="n">bulk_count_matrix</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Minimal run of CLIMB method</strong></p>
+<p>To run CLIMB with default parameters, you can simply launch:</p>
+<div class="highlight-R notranslate"><div class="highlight"><pre><span></span><span class="nf">library</span><span class="p">(</span><span class="n">climb</span><span class="p">)</span> <span class="p">;</span> <span class="nf">library</span><span class="p">(</span><span class="n">Biobase</span><span class="p">)</span>
+<span class="n">climb.res</span> <span class="o">=</span> <span class="nf">climb</span><span class="p">(</span><span class="n">scRNA.es</span><span class="p">,</span> <span class="n">bulk.es</span><span class="p">)</span>
+<span class="n">celltype_proportions</span> <span class="o">=</span> <span class="n">climb.res</span><span class="o">$</span><span class="n">props</span>
+</pre></div>
+</div>
+<p>By default, CLIMB only predict cell-type proportions and do not predict cell-type expression. If you wish to include cell-type expression deconvolution, just add the parameter <cite>predict_expression=TRUE</cite> when you launch CLIMB :</p>
+<div class="highlight-R notranslate"><div class="highlight"><pre><span></span><span class="nf">library</span><span class="p">(</span><span class="n">climb</span><span class="p">)</span> <span class="p">;</span> <span class="nf">library</span><span class="p">(</span><span class="n">Biobase</span><span class="p">)</span>
+<span class="n">climb.res</span> <span class="o">=</span> <span class="nf">climb</span><span class="p">(</span><span class="n">scRNA.es</span><span class="p">,</span> <span class="n">bulk.es</span><span class="p">,</span> <span class="n">predict_expression</span><span class="o">=</span><span class="kc">TRUE</span><span class="p">)</span>
+<span class="n">celltype_proportions</span> <span class="o">=</span> <span class="n">climb.res</span><span class="o">$</span><span class="n">props</span>
+<span class="n">celltype_expression</span> <span class="o">=</span> <span class="n">climb.res</span><span class="o">$</span><span class="n">expr.pred</span>
+</pre></div>
+</div>
 </section>
 
 
@@ -88,7 +108,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="detailmethods.html" class="btn btn-neutral float-right" title="Detailed methods" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="detailmethods.html" class="btn btn-neutral float-right" title="CLIMB method" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
