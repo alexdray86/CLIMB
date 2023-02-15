@@ -12,12 +12,14 @@
 #' @param cancer_pattern a string pattern present in all cancer cell-type. Only for these cell-types CLIMB will assume the presence of differentially expressed genes
 #' @export
 climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, ratio_cancer_cells=NA, up.lim=Inf, lambda=0, norm_factor=0.1){
+    num <- function(x){ return(as.numeric(as.character(x)))}
     ct.props = list() ; ct.exprs = list()
     sc.mat = exprs(sc)
     cell_expr = colSums(exprs(sc))
     save_coefs = list() ; save_ncoefs = list()
     cellTypes = levels(sc$cellType)
     N = dim(bulk)[2] ; G = dim(bulk)[1] ; K = length(cellTypes)
+    S_pred_mapping_n = array(rep(0,N*G*K), c(N,G,K))
     display('Bulk to single-cell mapping for prediction of cell-type abundance')
     for(i in 1:N){
         y = num(exprs(bulk)[,i])
@@ -57,6 +59,7 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
                 pred_expr = (t(coefs)[sel_ct] %*% t(sc.mat[,sel_ct])) #/ sum(t(coefs)[sel_ct])
                 pred_expr[is.na(pred_expr)] = 0
                 pred_exprs[[k]] = pred_expr
+                S_pred_mapping[,,k] = pred_expr
             }
             ct_exprs_pred = do.call(rbind, pred_exprs)
             ct.exprs[[i]] = ct_exprs_pred
