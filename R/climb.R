@@ -22,10 +22,13 @@ climb <- function(sc, bulk, cancer_pattern = "*", predict_expression=TRUE, norm_
     cellTypes = levels(sc$cellType)
     N = dim(bulk)[2] ; G = dim(bulk)[1] ; K = length(cellTypes)
     S_pred_mapping_n = array(rep(0,N*G*K), c(N,G,K))
-    display('Bulk to single-cell mapping for prediction of cell-type abundance')
+    message('Bulk to single-cell mapping for prediction of cell-type abundance')
     for(i in 1:N){
-        y = num(exprs(bulk)[,i])
-        fit = glmnet(sc.mat, y, lower.limits = 0.0, upper.limits = up.lim, lambda = lambda)
+        common_genes = intersect(rownames(bulk), rownames(sc))
+        message(paste0(length(common_genes), " common genes found for bulk ", colnames(bulk)[n]))
+        sc.mat.sub = exprs(sc)[common_genes,]
+        y = num(exprs(bulk)[common_genes,i])
+        fit = glmnet(sc.mat.sub, y, lower.limits = 0.0, upper.limits = up.lim, lambda = lambda)
         coefs = coef(fit)[-1,dim(coef(fit))[2]]
         if( norm_coefs ){ coefs = coefs / cell_expr } # Normalize coefs with total expression per cell
         agg = aggregate(coefs, list(sc$cellType), sum, drop=F)
@@ -70,9 +73,9 @@ climb <- function(sc, bulk, cancer_pattern = "*", predict_expression=TRUE, norm_
         save_ncoefs[[i]] = norm_coefs
     }
     climb.prop = do.call(rbind,ct.props)
-    display('Cell-type abundance done. ')
+    message('Cell-type abundance done. ')
     if(predict_expression){
-        display('Starting high-resolution expression deconvolution')
+        message('Starting high-resolution expression deconvolution')
         normal_sel = !grepl(cancer_pattern,sc$cellType) ; cancer_sel = grepl(cancer_pattern,sc$cellType)
         cancer_ct_sel = grepl(cancer_pattern,cellTypes)
         alpha_overal = do.call(rbind,save_coefs)
@@ -104,7 +107,7 @@ climb <- function(sc, bulk, cancer_pattern = "*", predict_expression=TRUE, norm_
                 S_pred_n[n,g,] = rep(0,K)
             }
             if( g %% 1000 == 0){
-                display(paste0('High-Resolution expression prediction: ', g, ' genes processed...'))
+                message(paste0('High-Resolution expression prediction: ', g, ' genes processed...'))
             }
         }
         dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
