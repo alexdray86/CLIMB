@@ -140,7 +140,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", predict_expression = TRUE,
         dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
         dimnames(S_pred_n)[[2]] = dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
         dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
-        final_res = list(as.matrix(climb.prop), S_pred_n, ptc_norm(S_pred_n), 
+        final_res = list(as.matrix(climb.prop), S_pred_n, ptc_norm(S_pred_n, climb.prop), 
             S_pred_mapping_n, save_coefs)
         names(final_res) = c("props", "expr.pred", "expr.pred.ptc", 
             "expr.mapping", "coefs")
@@ -148,7 +148,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", predict_expression = TRUE,
     }
     else {
         final_res = list(as.matrix(climb.prop), S_pred_mapping_n, 
-                         ptc_norm(S_pred_mapping_n), save_coefs)
+                         ptc_norm(S_pred_mapping_n, climb.prop), save_coefs)
         names(final_res) = c("props", "expr.mapping", "expr.mapping.ptc", 
                              "coefs")
         return(final_res)
