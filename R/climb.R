@@ -6,12 +6,14 @@
 #' @param sc ExpressionSet object containing the scRNA-seq reference dataset
 #' @param bulk ExpressionSet object containing the mixtures to be deconvoluted
 #' @param ratio_cancer_cells numeric vector, same size as number of mixtures. if we have data about the fraction of cancer cells present in mixture, this can improve deconvolution accuracy. If ratio_cancer_cells is provided, then CLIMB-BA method will be used. It is important that cancer cell-types in the scRNA-seq dataset contains the pattern "-like" to be recognized as cancer cells.
+#' @param predict_expression boolean indicating whether cell-type expression should be predicted (takes longer to run)
+#' @param norm_coefs boolean indicating whether coefficients should be normalized by total RNA content
 #' @param up.lim numeric scalar, impose a l-infinity norm to the linear model (upper bound for coefficient)
 #' @param lambda Regularization factor
 #' @param norm_factor if ratio_cancer_cells is provided, indicate strength of smooth normalization
 #' @param cancer_pattern a string pattern present in all cancer cell-type. Only for these cell-types CLIMB will assume the presence of differentially expressed genes
 #' @export
-climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, ratio_cancer_cells=NA, up.lim=Inf, lambda=0, norm_factor=0.1){
+climb <- function(sc, bulk, cancer_pattern = "*", predict_expression=TRUE, norm_coefs=FALSE, ratio_cancer_cells=NA, up.lim=Inf, lambda=0, norm_factor=0.1){
     num <- function(x){ return(as.numeric(as.character(x)))}
     ct.props = list() ; ct.exprs = list()
     sc.mat = exprs(sc)
@@ -25,8 +27,8 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
         y = num(exprs(bulk)[,i])
         fit = glmnet(sc.mat, y, lower.limits = 0.0, upper.limits = up.lim, lambda = lambda)
         coefs = coef(fit)[-1,dim(coef(fit))[2]]
-        norm_coefs = coefs / cell_expr # Normalize coefs with total expression per cell
-        agg = aggregate(norm_coefs, list(sc$cellType), sum, drop=F)
+        if( norm_coefs ){ coefs = coefs / cell_expr } # Normalize coefs with total expression per cell
+        agg = aggregate(coefs, list(sc$cellType), sum, drop=F)
         # If information about cancer cell ratio is given, then a smooth normalization is done hereafter
         if(!is.na(sum(num(ratio_cancer_cells)))){
             colnames(agg) = c('celltype', 'sum_coefs')
@@ -69,7 +71,7 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
     }
     climb.prop = do.call(rbind,ct.props)
     display('Cell-type abundance done. ')
-    if(predict_expression && any(grepl(cancer_pattern, cellTypes))){
+    if(predict_expression){
         display('Starting high-resolution expression deconvolution')
         normal_sel = !grepl(cancer_pattern,sc$cellType) ; cancer_sel = grepl(cancer_pattern,sc$cellType)
         cancer_ct_sel = grepl(cancer_pattern,cellTypes)
@@ -108,19 +110,19 @@ climb <- function(sc, bulk, cancer_pattern = "-like", predict_expression=TRUE, r
         dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
         dimnames(S_pred_n)[[2]] = dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
         dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
-        final_res = list(as.matrix(climb.prop), S_pred_n, S_pred_mapping_n, save_coefs, save_ncoefs)
-        names(final_res) = c('props', 'expr.pred', 'expr.mapping', 'coefs', 'coefs.norm')
-        return(final_res)
-    } else if (predict_expression) {
-        dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
-        dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
-        dimnames(S_pred_mapping_n)[[3]] = cellTypes
-        final_res = list(as.matrix(climb.prop), S_pred_mapping_n, save_coefs, save_ncoefs)
-        names(final_res) = c('props', 'expr.mapping', 'coefs', 'coefs.norm')
+        # Normalization of high-resolution expression
+        S_pred_ptc_n = S_pred_n
+        for(n in 1:dim(climb.cpm.res$expr.pred)[1]){
+            S_pred_ptc_n[n,,] = t(t(S_pred_n[n,,]) / num(climb.prop[n,]*1000+1))
+            S_pred_ptc_n[n,,][is.na(S_pred_ptc_n[n,,])] = 0
+            S_pred_ptc_n[n,,][S_pred_ptc_n[n,,] == Inf] = 0
+        }
+        final_res = list(as.matrix(climb.prop), S_pred_n, S_pred_ptc_n, S_pred_mapping_n, save_coefs)
+        names(final_res) = c('props', 'expr.pred', 'expr.pred.ptc', 'expr.mapping', 'coefs')
         return(final_res)
     } else { 
-        final_res = list(as.matrix(climb.prop), save_coefs, save_ncoefs)
-        names(final_res) = c('props', 'coefs', 'coefs.norm')
+        final_res = list(as.matrix(climb.prop), save_coefs)
+        names(final_res) = c('props', 'coefs')
         return(final_res)
     }
 }
