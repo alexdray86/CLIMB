@@ -13,58 +13,81 @@
 #' @param norm_factor if ratio_cancer_cells is provided, indicate strength of smooth normalization
 #' @param cancer_pattern a string pattern present in all cancer cell-type. Only for these cell-types CLIMB will assume the presence of differentially expressed genes
 #' @export
-climb <- function(sc, bulk, cancer_pattern = "*", predict_expression=TRUE, norm_coefs=FALSE, ratio_cancer_cells=NA, up.lim=Inf, lambda=0, norm_factor=0.1){
-    num <- function(x){ return(as.numeric(as.character(x)))}
-    ct.props = list() ; ct.exprs = list()
+climb <- function (sc, bulk, cancer_pattern = "*", predict_expression = TRUE, 
+    norm_coefs = FALSE, ratio_cancer_cells = NA, up.lim = Inf, 
+    lambda = 0, norm_factor = 0.1) {
+    num <- function(x) {
+        return(as.numeric(as.character(x)))
+    }
+    ptc_norm <- function(x, c) {
+        x_ptc = x
+        for (n in 1:dim(x)[1]) {
+            x_ptc[n, , ] = t(t(x[n, , ])/num(c[n,] * 1000+1))
+            x_ptc[n, , ][is.na(x_ptc[n, , ])] = 0
+            x_ptc[n, , ][x_ptc[n, , ] == Inf] = 0
+        }
+        return(x_ptc)
+    }
+    ct.props = list()
+    ct.exprs = list()
     sc.mat = exprs(sc)
     cell_expr = colSums(exprs(sc))
-    save_coefs = list() ; save_ncoefs = list()
+    save_coefs = list()
+    save_ncoefs = list()
     cellTypes = levels(sc$cellType)
-    N = dim(bulk)[2] ; G = dim(bulk)[1] ; K = length(cellTypes)
-    S_pred_mapping_n = array(rep(0,N*G*K), c(N,G,K))
-    message('Bulk to single-cell mapping for prediction of cell-type abundance')
-    for(i in 1:N){
+    N = dim(bulk)[2]
+    G = dim(bulk)[1]
+    K = length(cellTypes)
+    S_pred_mapping_n = array(rep(0, N * G * K), c(N, G, K))
+    message("Bulk to single-cell mapping for prediction of cell-type abundance")
+    for (i in 1:N) {
         common_genes = intersect(rownames(bulk), rownames(sc))
-        message(paste0(length(common_genes), " common genes found for bulk ", colnames(bulk)[n]))
-        sc.mat.sub = exprs(sc)[common_genes,]
-        y = num(exprs(bulk)[common_genes,i])
-        fit = glmnet(sc.mat.sub, y, lower.limits = 0.0, upper.limits = up.lim, lambda = lambda)
-        coefs = coef(fit)[-1,dim(coef(fit))[2]]
-        if( norm_coefs ){ coefs = coefs / cell_expr } # Normalize coefs with total expression per cell
-        agg = aggregate(coefs, list(sc$cellType), sum, drop=F)
-        # If information about cancer cell ratio is given, then a smooth normalization is done hereafter
-        if(!is.na(sum(num(ratio_cancer_cells)))){
-            colnames(agg) = c('celltype', 'sum_coefs')
-            # Correct proportions with ratio cancer cells
-            b_n = num(ratio_cancer_cells[i]) # True ratio cancer cells
-            b_hat_n = sum(agg[grepl(cancer_pattern,agg$celltype),]$sum_coefs) / sum(agg$sum_coefs) # predicted blast count
-            # normalization factors
-            f_n = (b_n + norm_factor) / (b_hat_n + norm_factor)
-            f_n_n = (1 - b_n + norm_factor) / (1 - b_hat_n + norm_factor)
+        message(paste0(length(common_genes), " common genes found between scRNA-seq refererence and bulk ", 
+            colnames(bulk)[i]))
+        sc.mat.sub = exprs(sc)[common_genes, ]
+        y = num(exprs(bulk)[common_genes, i])
+        fit = glmnet(sc.mat.sub, y, lower.limits = 0, upper.limits = up.lim, 
+            lambda = lambda)
+        coefs = coef(fit)[-1, dim(coef(fit))[2]]
+        if (norm_coefs) {
+            coefs = coefs/cell_expr
+        }
+        agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
+        if (!is.na(sum(num(ratio_cancer_cells)))) {
+            colnames(agg) = c("celltype", "sum_coefs")
+            b_n = num(ratio_cancer_cells[i])
+            b_hat_n = sum(agg[grepl(cancer_pattern, agg$celltype), 
+                ]$sum_coefs)/sum(agg$sum_coefs)
+            f_n = (b_n + norm_factor)/(b_hat_n + norm_factor)
+            f_n_n = (1 - b_n + norm_factor)/(1 - b_hat_n + norm_factor)
             agg_norm = agg
-            agg_norm[grepl(cancer_pattern,agg$celltype),]$sum_coefs <- agg_norm[grepl(cancer_pattern,agg$celltype),]$sum_coefs * f_n
-            agg_norm[!grepl(cancer_pattern,agg$celltype),]$sum_coefs <- agg_norm[!grepl(cancer_pattern,agg$celltype),]$sum_coefs * f_n_n
+            agg_norm[grepl(cancer_pattern, agg$celltype), ]$sum_coefs <- agg_norm[grepl(cancer_pattern, 
+                agg$celltype), ]$sum_coefs * f_n
+            agg_norm[!grepl(cancer_pattern, agg$celltype), ]$sum_coefs <- agg_norm[!grepl(cancer_pattern, 
+                agg$celltype), ]$sum_coefs * f_n_n
             agg_norm$sum_coefs = num(agg_norm$sum_coefs)
-            agg_norm = agg_norm[match(levels(sc$cellType), agg_norm$celltype),]
-            # Compute proportions and return results
-            ppred = (agg_norm$sum_coefs) / sum(agg_norm$sum_coefs)
-            ct.props[[i]] = ppred
-        } else {
-            ppred = (agg$x) / sum(agg$x)      
-            names(ppred) = agg$`Group.1`
+            agg_norm = agg_norm[match(levels(sc$cellType), agg_norm$celltype), 
+                ]
+            ppred = (agg_norm$sum_coefs)/sum(agg_norm$sum_coefs)
             ct.props[[i]] = ppred
         }
-        if(predict_expression){
+        else {
+            ppred = (agg$x)/sum(agg$x)
+            names(ppred) = agg$Group.1
+            ct.props[[i]] = ppred
+        }
+        if (predict_expression) {
             pcor_expr_pred = list()
             all_celltypes = levels(sc$cellType)
             pred_exprs = list()
-            for(k in 1:length(all_celltypes)){
+            for (k in 1:length(all_celltypes)) {
                 this_ct = all_celltypes[k]
                 sel_ct = sc$cellType == this_ct
-                pred_expr = (t(coefs)[sel_ct] %*% t(sc.mat[,sel_ct])) #/ sum(t(coefs)[sel_ct])
+                pred_expr = (t(coefs)[sel_ct] %*% t(sc.mat[, 
+                  sel_ct]))
                 pred_expr[is.na(pred_expr)] = 0
                 pred_exprs[[k]] = pred_expr
-                S_pred_mapping[,,k] = pred_expr
+                S_pred_mapping_n[, , k] = pred_expr
             }
             ct_exprs_pred = do.call(rbind, pred_exprs)
             ct.exprs[[i]] = ct_exprs_pred
@@ -72,60 +95,62 @@ climb <- function(sc, bulk, cancer_pattern = "*", predict_expression=TRUE, norm_
         save_coefs[[i]] = coefs
         save_ncoefs[[i]] = norm_coefs
     }
-    climb.prop = do.call(rbind,ct.props)
-    message('Cell-type abundance done. ')
-    if(predict_expression){
-        message('Starting high-resolution expression deconvolution')
-        normal_sel = !grepl(cancer_pattern,sc$cellType) ; cancer_sel = grepl(cancer_pattern,sc$cellType)
-        cancer_ct_sel = grepl(cancer_pattern,cellTypes)
-        alpha_overal = do.call(rbind,save_coefs)
-        alpha_cancer = do.call(rbind,save_coefs)[,cancer_sel]
-        sc.cancer = sc[,cancer_sel]
+    climb.prop = do.call(rbind, ct.props)
+    message("Cell-type abundance prediction done. ")
+    if (predict_expression) {
+        message("Starting high-resolution expression deconvolution")
+        normal_sel = !grepl(cancer_pattern, sc$cellType)
+        cancer_sel = grepl(cancer_pattern, sc$cellType)
+        cancer_ct_sel = grepl(cancer_pattern, cellTypes)
+        alpha_overal = do.call(rbind, save_coefs)
+        alpha_cancer = do.call(rbind, save_coefs)[, cancer_sel]
+        sc.cancer = sc[, cancer_sel]
         C_overal = exprs(sc)
         Y_hat_overal = alpha_overal %*% t(C_overal)
-        Y_true_bulk  = t(exprs(bulk))
+        Y_true_bulk = t(exprs(bulk))
         Epsilon_ng = Y_true_bulk - Y_hat_overal
-        ### Compute Prediction of Cell-type Expression 
-        S_pred_n = array(rep(0,N*G*K), c(N,G,K))
-        S_pred_mapping_n = array(rep(0,N*G*K), c(N,G,K))
-        # iterate over genes
-        for(g in 1:G){
-            Epsilon_g = num(Epsilon_ng[,g])
-            if(sd(Epsilon_g) != 0){
+        S_pred_n = array(rep(0, N * G * K), c(N, G, K))
+        
+        for (g in 1:G) {
+            Epsilon_g = num(Epsilon_ng[, g])
+            if (sd(Epsilon_g) != 0) {
                 fit = glmnet(alpha_cancer, Epsilon_g, intercept = TRUE)
-                C_diff_cancer = num(coef(fit)[-1,dim(coef(fit))[2]])
-                # iterate over bulks
-                for(n in 1:N){
-                    Epsilon_cancer_n = aggregate(C_diff_cancer*alpha_cancer[n,], list(sc.cancer$cellType), sum)$x
-                    Epsilon_n = rep(0, K)
-                    Epsilon_n[cancer_ct_sel] = Epsilon_cancer_n
-                    S_pred_mapping_n[n,g,] = ct.exprs[[n]][,g]   # cell-type expression from mapping
-                    S_pred_n[n,g,] = S_pred_mapping_n[n,g,] + Epsilon_n  # cell-type expression from prediction
-                    S_pred_n[n,g,][S_pred_n[n,g,]<0] = 0
-                } 
-            } else {
-                S_pred_n[n,g,] = rep(0,K)
+                C_diff_cancer = num(coef(fit)[-1, dim(coef(fit))[2]])
+                for (n in 1:N) {
+                  Epsilon_cancer_n = aggregate(C_diff_cancer * 
+                    alpha_cancer[n, ], list(sc.cancer$cellType), 
+                    sum)$x
+                  Epsilon_n = rep(0, K)
+                  Epsilon_n[cancer_ct_sel] = Epsilon_cancer_n
+                  S_pred_mapping_n[n, g, ] = ct.exprs[[n]][, 
+                    g]
+                  S_pred_n[n, g, ] = S_pred_mapping_n[n, g, ] + 
+                    Epsilon_n
+                  S_pred_n[n, g, ][S_pred_n[n, g, ] < 0] = 0
+                }
             }
-            if( g %% 1000 == 0){
-                message(paste0('High-Resolution expression prediction: ', g, ' genes processed...'))
+            else {
+                S_pred_n[n, g, ] = rep(0, K)
+            }
+            if (g%%1000 == 0) {
+                message(paste0("High-Resolution expression prediction: ", 
+                  g, " genes processed..."))
             }
         }
         dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
         dimnames(S_pred_n)[[2]] = dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
         dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
-        # Normalization of high-resolution expression
-        S_pred_ptc_n = S_pred_n
-        for(n in 1:dim(climb.cpm.res$expr.pred)[1]){
-            S_pred_ptc_n[n,,] = t(t(S_pred_n[n,,]) / num(climb.prop[n,]*1000+1))
-            S_pred_ptc_n[n,,][is.na(S_pred_ptc_n[n,,])] = 0
-            S_pred_ptc_n[n,,][S_pred_ptc_n[n,,] == Inf] = 0
-        }
-        final_res = list(as.matrix(climb.prop), S_pred_n, S_pred_ptc_n, S_pred_mapping_n, save_coefs)
-        names(final_res) = c('props', 'expr.pred', 'expr.pred.ptc', 'expr.mapping', 'coefs')
+        final_res = list(as.matrix(climb.prop), S_pred_n, ptc_norm(S_pred_n), 
+            S_pred_mapping_n, save_coefs)
+        names(final_res) = c("props", "expr.pred", "expr.pred.ptc", 
+            "expr.mapping", "coefs")
         return(final_res)
-    } else { 
-        final_res = list(as.matrix(climb.prop), save_coefs)
-        names(final_res) = c('props', 'coefs')
+    }
+    else {
+        final_res = list(as.matrix(climb.prop), S_pred_mapping_n, 
+                         ptc_norm(S_pred_mapping_n), save_coefs)
+        names(final_res) = c("props", "expr.mapping", "expr.mapping.ptc", 
+                             "coefs")
         return(final_res)
     }
 }
