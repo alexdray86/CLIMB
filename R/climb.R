@@ -42,6 +42,11 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
         message('EXPRESSION mode: predicting cell-type expression in bulks - requires single-cell coefficients fitted by CLIMB')
         predict_abundance = TRUE ; predict_expression = TRUE ; DE_analysis = FALSE; patient_specific_DE=FALSE
     }
+    if (mode=='DE.only'){
+        message('Running DE analysis based on existing CLIMB object')
+        predict_abundance = FALSE ; predict_expression = FALSE ; DE_analysis = TRUE ; patient_specific_DE=FALSE
+        stopifnot(length(final_res)>0) 
+    }
     num <- function(x) { return(as.numeric(as.character(x))) }
     ct.props = list()
     ct.exprs = list()
