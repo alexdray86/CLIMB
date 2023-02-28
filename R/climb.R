@@ -186,7 +186,11 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
             w_k_per1000cells = round(t(1000*ct_prop))+1
             dds.ct <- DESeqDataSetFromMatrix(countData = w_k_per1000cells, colData= colData, 
                                               design =(~ tot_expr + condition)) 
-            dds.ct <- DESeq(dds.ct)
+            dds.ct <- tryCatch( expr = { DESeq(dds.ct) },
+                    error=function(cond) {
+                        message("Error with DE analysis, using fit with mean instead")
+                        return(DESeq(dds.ct, fitType="mean"))
+                })
             df_res.ct = results(dds.ct)[order(results(dds.ct)$pvalue, decreasing = F),]
         }
         for(k in 1:K){
@@ -198,7 +202,11 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
                 colData = data.frame(condition = conditions, celltype_prop = w_k, tot_expr = tot_expr)
                 dds <- DESeqDataSetFromMatrix(countData = t(S_k)+1, colData= colData, 
                                                   design =(~ tot_expr + celltype_prop + condition)) 
-                dds <- DESeq(dds)
+                dds <- tryCatch( expr = { DESeq(dds) },
+                    error=function(cond) {
+                        message("Error with DE analysis, using fit with mean instead")
+                        return(DESeq(dds, fitType="mean"))
+                })
                 fcs[,k] = num(-1*results(dds, tidy=TRUE)$log2FoldChange)
                 pvals[,k] = num(results(dds, tidy=TRUE)$pvalue)
                 padjs[,k] = num(results(dds, tidy=TRUE)$padj)
@@ -217,6 +225,11 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
                     dds <- DESeqDataSetFromMatrix(countData = t(S_k.n)+1, colData= colData, 
                                                       design =(~ tot_expr + celltype_prop + condition)) #design =(~ celltype_prop + condition)
                     dds <- DESeq(dds)
+                    dds <- tryCatch( expr = { DESeq(dds) },
+                        error=function(cond) {
+                            message("Error with DE analysis, using fit with mean instead")
+                            return(DESeq(dds, fitType="mean"))
+                    })
                     fcs.N[n,,k] = num(-1*results(dds, tidy=TRUE)$log2FoldChange)
                     pvals.N[n,,k] = num(results(dds, tidy=TRUE)$pvalue)
                     padjs.N[n,,k] = num(results(dds, tidy=TRUE)$padj)
