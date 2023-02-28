@@ -204,6 +204,7 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
                 message(paste0('DE analysis between two conditions: ', unique(conditions)[1], ' vs ', unique(conditions)[2]))
                 S_k = S_mat[,,k] 
                 w_k = ct_prop[,k]
+                if ( rankMatrix(S_k)[1] == 0 ){ message('matrix not full ranked, skipping cell-type') ; next }
                 colData = data.frame(condition = conditions, celltype_prop = w_k, tot_expr = tot_expr)
                 dds <- DESeqDataSetFromMatrix(countData = t(S_k)+1, colData= colData, 
                                                   design =(~ tot_expr + celltype_prop + condition)) 
@@ -225,6 +226,7 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
                     conditions.n = cond_temp[sel.n]
                     S_k.n = S_k[sel.n,]
                     w_k.n = w_k[sel.n]
+                    if ( rankMatrix(S_k.n)[1] == 0 ){ message('matrix not full ranked, skipping cell-type') ; next }
                     tot_expr.n = num(total_expr/1e6)[sel.n]
                     colData = data.frame(condition = conditions.n, celltype_prop = w_k.n, tot_expr = tot_expr.n)
                     dds <- DESeqDataSetFromMatrix(countData = t(S_k.n)+1, colData= colData, 
