@@ -18,7 +18,7 @@
 #' @param conditions vector associated with each bulk samples. Should be the same size as the number of bulks, and should contains two values only: 'condition' and 'control'. For instance, disease samples (condition) versus healthy (control), or KO samples (condition) versus wild type (control).
 #' @param patient_specific_DE boolean indicating whether to perform DE for each sample individually. In that case, each sample will be compared to the 'control' group in the vector 'conditions'. If no vector conditions is provided, every other samples will be used as control samples. 
 #' @export
-climb <- function(sc, bulk, cancer_pattern = "*", mode = 'all', 
+climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA', 
     norm_coefs = FALSE, ratio_cancer_cells = NA, up.lim = Inf, 
     lambda = 0, norm_factor = 0.1, conditions=NA, 
     predict_abundance=TRUE, predict_expression = TRUE, DE_analysis=FALSE, patient_specific_DE=FALSE, 
@@ -183,7 +183,7 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'all',
             message(paste0('DE analysis of cell-type proportions'))
             colData = data.frame(condition = conditions, tot_expr = tot_expr)
             # cell-type proportion comparison
-            w_k_per1000cells = round(t(1000*tot_expr*ct_prop))
+            w_k_per1000cells = round(t(1000*ct_prop))+1
             dds.ct <- DESeqDataSetFromMatrix(countData = w_k_per1000cells, colData= colData, 
                                               design =(~ tot_expr + condition)) 
             dds.ct <- DESeq(dds.ct)
