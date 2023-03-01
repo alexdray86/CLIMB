@@ -93,6 +93,7 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
                 ppred = (agg_norm$sum_coefs)/sum(agg_norm$sum_coefs)
                 b_hat_n_posterior = sum(ppred[grepl(cancer_pattern, agg$celltype)])
                 message(paste0('Cancer cell ratio provided: ',b_n,', predicted prior to smooth norm: ',b_hat_n, ', corrected: ', b_hat_n_posterior))
+                names(ppred) = agg_norm$Group.1
                 ct.props[[i]] = ppred
             }
             else {
