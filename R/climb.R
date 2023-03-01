@@ -17,56 +17,81 @@
 #' @param DE_analysis boolean indicating whether to perform DE analysis between two conditions. Requires the vector 'conditions' to be given as input.
 #' @param conditions vector associated with each bulk samples. Should be the same size as the number of bulks, and should contains two values only: 'condition' and 'control'. For instance, disease samples (condition) versus healthy (control), or KO samples (condition) versus wild type (control).
 #' @param patient_specific_DE boolean indicating whether to perform DE for each sample individually. In that case, each sample will be compared to the 'control' group in the vector 'conditions'. If no vector conditions is provided, every other samples will be used as control samples. 
+#' @param final_res previous CLIMB result to use for DE analysis.
+#' @param min_common_genes minimum number of genes to be in common between bulk and scRNA-seq datsets 
 #' @export
-climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA', 
-    norm_coefs = FALSE, ratio_cancer_cells = NA, up.lim = Inf, 
-    lambda = 0, norm_factor = 0.1, conditions=NA, 
-    predict_abundance=TRUE, predict_expression = TRUE, DE_analysis=FALSE, patient_specific_DE=FALSE, 
-    final_res=list())
+climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = FALSE, 
+    ratio_cancer_cells = NA, up.lim = Inf, lambda = 0, norm_factor = 0.1, 
+    conditions = NA, predict_abundance = TRUE, predict_expression = TRUE, 
+    DE_analysis = FALSE, patient_specific_DE = FALSE, final_res = list(),
+    min_common_genes = 100) 
 {
-    if (mode=="all"){ 
-        message('ALL mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions')
-        predict_abundance = TRUE ; predict_expression = TRUE ; DE_analysis = TRUE; patient_specific_DE=FALSE
+    if (mode == "all") {
+        message("ALL mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions")
+        predict_abundance = TRUE
+        predict_expression = TRUE
+        DE_analysis = TRUE
+        patient_specific_DE = FALSE
         stopifnot(!all(is.na(conditions)))
     }
-    if (mode=="all+"){ 
-        message('ALL+ mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions if provided AND at sample level')
-        message('WARNING: sample-level DE can take long!')
-        predict_abundance = TRUE ; predict_expression = TRUE ; DE_analysis = TRUE; patient_specific_DE=TRUE
+    if (mode == "all+") {
+        message("ALL+ mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions if provided AND at sample level")
+        message("WARNING: sample-level DE can take long!")
+        predict_abundance = TRUE
+        predict_expression = TRUE
+        DE_analysis = TRUE
+        patient_specific_DE = TRUE
     }
-    if (mode=="abundance"){ 
-        message('ABUNDANCE mode: predicting cell-type proportions in bulks') ; 
-        predict_abundance = TRUE ; predict_expression = FALSE ; DE_analysis = FALSE; patient_specific_DE=FALSE
+    if (mode == "abundance") {
+        message("ABUNDANCE mode: predicting cell-type proportions in bulks")
+        predict_abundance = TRUE
+        predict_expression = FALSE
+        DE_analysis = FALSE
+        patient_specific_DE = FALSE
     }
-    if (mode=="expression"){ 
-        message('EXPRESSION mode: predicting cell-type expression in bulks - requires single-cell coefficients fitted by CLIMB')
-        predict_abundance = TRUE ; predict_expression = TRUE ; DE_analysis = FALSE; patient_specific_DE=FALSE
+    if (mode == "expression") {
+        message("EXPRESSION mode: predicting cell-type expression in bulks - requires single-cell coefficients fitted by CLIMB")
+        predict_abundance = TRUE
+        predict_expression = TRUE
+        DE_analysis = FALSE
+        patient_specific_DE = FALSE
     }
-    if (mode=='DE.only'){
-        message('Running DE analysis based on existing CLIMB object')
-        predict_abundance = FALSE ; predict_expression = FALSE ; DE_analysis = TRUE ; patient_specific_DE=FALSE
-        stopifnot(length(final_res)>0) 
+    if (mode == "DE.only") {
+        message("Running DE analysis based on existing CLIMB object")
+        predict_abundance = FALSE
+        predict_expression = FALSE
+        DE_analysis = TRUE
+        patient_specific_DE = FALSE
+        stopifnot(length(final_res) > 0)
     }
-    num <- function(x) { return(as.numeric(as.character(x))) }
-    ct.props = list() ; ct.props.ba = list()
+    num <- function(x) {
+        return(as.numeric(as.character(x)))
+    }
+    ct.props = list()
+    ct.props.ba = list()
     ct.exprs = list()
     sc.mat = exprs(sc)
     cell_expr = colSums(exprs(sc))
     save_coefs = list()
     save_ncoefs = list()
     cellTypes = levels(sc$cellType)
+    # Find common genes between bulk dataset and scRNA-seq
+    common_genes = intersect(rownames(bulk), rownames(sc))
+    message(paste0(length(common_genes), " common genes found between scRNA-seq refererence and bulk datasets"))
+    if( length(common_genes) < min_common_genes ){
+        stop('too few genes found between scRNA-seq refererence and bulk dataset')
+    }
+    sc = sc[common_genes, ]
+    bulk = bulk[common_genes, ]
     N = dim(bulk)[2]
     G = dim(bulk)[1]
     K = length(cellTypes)
     S_pred_mapping_n = array(rep(0, N * G * K), c(N, G, K))
-    if ( predict_abundance ){
+    if (predict_abundance) {
         message("Bulk to single-cell mapping for prediction of cell-type abundance")
         for (i in 1:N) {
-            common_genes = intersect(rownames(bulk), rownames(sc))
-            message(paste0(length(common_genes), " common genes found between scRNA-seq refererence and bulk ", 
-                colnames(bulk)[i]))
-            sc.mat.sub = exprs(sc)[common_genes, ]
-            y = num(exprs(bulk)[common_genes, i])
+            sc.mat.sub = exprs(sc)
+            y = num(exprs(bulk)[, i])
             fit = glmnet(sc.mat.sub, y, lower.limits = 0, upper.limits = up.lim, 
                 lambda = lambda)
             coefs = coef(fit)[-1, dim(coef(fit))[2]]
@@ -75,29 +100,35 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
             }
             agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
             if (!is.na(sum(num(ratio_cancer_cells)))) {
-                message('Using cancer cell ratio for smooth normalization')
+                message("Using cancer cell ratio for smooth normalization")
                 colnames(agg) = c("celltype", "sum_coefs")
                 b_n = num(ratio_cancer_cells[i])
                 b_hat_n = sum(agg[grepl(cancer_pattern, agg$celltype), 
-                    ]$sum_coefs)/sum(agg$sum_coefs)
+                  ]$sum_coefs)/sum(agg$sum_coefs)
                 f_n = (b_n + norm_factor)/(b_hat_n + norm_factor)
-                f_n_n = (1 - b_n + norm_factor)/(1 - b_hat_n + norm_factor)
+                f_n_n = (1 - b_n + norm_factor)/(1 - b_hat_n + 
+                  norm_factor)
                 agg_norm = agg
-                agg_norm[grepl(cancer_pattern, agg$celltype), ]$sum_coefs <- agg_norm[grepl(cancer_pattern, 
-                    agg$celltype), ]$sum_coefs * f_n
-                agg_norm[!grepl(cancer_pattern, agg$celltype), ]$sum_coefs <- agg_norm[!grepl(cancer_pattern, 
-                    agg$celltype), ]$sum_coefs * f_n_n
+                agg_norm[grepl(cancer_pattern, agg$celltype), 
+                  ]$sum_coefs <- agg_norm[grepl(cancer_pattern, 
+                  agg$celltype), ]$sum_coefs * f_n
+                agg_norm[!grepl(cancer_pattern, agg$celltype), 
+                  ]$sum_coefs <- agg_norm[!grepl(cancer_pattern, 
+                  agg$celltype), ]$sum_coefs * f_n_n
                 agg_norm$sum_coefs = num(agg_norm$sum_coefs)
-                agg_norm = agg_norm[match(levels(sc$cellType), agg_norm$celltype),]
+                agg_norm = agg_norm[match(levels(sc$cellType), 
+                  agg_norm$celltype), ]
                 ppred = (agg_norm$sum_coefs)/sum(agg_norm$sum_coefs)
-                b_hat_n_posterior = sum(ppred[grepl(cancer_pattern, agg$celltype)])
-                message(paste0('Cancer cell ratio provided: ',b_n,', predicted prior to smooth norm: ',b_hat_n, ', corrected: ', b_hat_n_posterior))
+                b_hat_n_posterior = sum(ppred[grepl(cancer_pattern, 
+                  agg$celltype)])
+                message(paste0("Cancer cell ratio provided: ", 
+                  b_n, ", predicted prior to smooth norm: ", 
+                  b_hat_n, ", corrected: ", b_hat_n_posterior))
                 names(ppred) = agg_norm$celltype
                 ct.props.ba[[i]] = ppred
                 ppred = (agg$sum_coefs)/sum(agg$sum_coefs)
                 names(ppred) = agg$celltype
                 ct.props[[i]] = ppred
-
             }
             else {
                 ppred = (agg$x)/sum(agg$x)
@@ -110,13 +141,13 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
                 all_celltypes = levels(sc$cellType)
                 pred_exprs = list()
                 for (k in 1:length(all_celltypes)) {
-                    this_ct = all_celltypes[k]
-                    sel_ct = sc$cellType == this_ct
-                    pred_expr = (t(coefs)[sel_ct] %*% t(sc.mat[, 
-                      sel_ct]))
-                    pred_expr[is.na(pred_expr)] = 0
-                    pred_exprs[[k]] = pred_expr
-                    S_pred_mapping_n[, , k] = pred_expr
+                  this_ct = all_celltypes[k]
+                  sel_ct = sc$cellType == this_ct
+                  pred_expr = (t(coefs)[sel_ct] %*% t(sc.mat.sub[, 
+                    sel_ct]))
+                  pred_expr[is.na(pred_expr)] = 0
+                  pred_exprs[[k]] = pred_expr
+                  S_pred_mapping_n[, , k] = pred_expr
                 }
                 ct_exprs_pred = do.call(rbind, pred_exprs)
                 ct.exprs[[i]] = ct_exprs_pred
@@ -170,108 +201,143 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
         dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
         dimnames(S_pred_n)[[2]] = dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
         dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
-        final_res$expr.pred = S_pred_n 
-        final_res$expr.mapping = S_pred_mapping_n ; final_res$coefs = save_coefs
-    } else {
-        final_res$expr.mapping = S_pred_mapping_n ; final_res$coefs = save_coefs
+        final_res$expr.pred = S_pred_n
+        final_res$expr.mapping = S_pred_mapping_n
+        final_res$coefs = save_coefs
     }
-    if( !all(is.na(conditions)) ){ DE_analysis = TRUE }
-    if( DE_analysis == TRUE ){
-        message('Starting DE analysis')
-        define_signif <- function(p_){
+    else {
+        final_res$expr.mapping = S_pred_mapping_n
+        final_res$coefs = save_coefs
+    }
+    if (!all(is.na(conditions))) {
+        DE_analysis = TRUE
+    }
+    if (DE_analysis == TRUE) {
+        message("Starting DE analysis")
+        define_signif <- function(p_) {
             signif_p_ = p_
-            signif_p_[p_ < 0.05] = '*'    ; signif_p_[p_ < 0.01] = '**'
-            signif_p_[p_ < 0.001] = '***' ; signif_p_[p_ < 0.0001] = '****'
-            signif_p_[p_ >= 0.05] = 'n.s'
+            signif_p_[p_ < 0.05] = "*"
+            signif_p_[p_ < 0.01] = "**"
+            signif_p_[p_ < 0.001] = "***"
+            signif_p_[p_ < 1e-04] = "****"
+            signif_p_[p_ >= 0.05] = "n.s"
             return(signif_p_)
         }
         S_mat = round(final_res$expr.pred)
         ct_prop = final_res$props
-        tot_expr = num(colSums(exprs(bulk)))/1e6
-        N = dim(S_mat)[1] ; G = dim(S_mat)[2] ; K = dim(S_mat)[3]
-        pvals = array(rep(1,G*K), c(G,K)) ; padjs = array(rep(1,G*K), c(G,K)) ; fcs =  array(rep(0,G*K), c(G,K))
-        pvals.N = array(rep(1,N*G*K), c(N,G,K)) ; padjs.N = array(rep(1,N*G*K), c(N,G,K))
-        fcs.N = array(rep(1,N*G*K), c(N,G,K))
-        ct.pvals = array(rep(1,K), c(K)) ; ct.padjs = array(rep(1,K), c(G,K)) ; ct.fcs =  array(rep(0,K), c(K))
-        if(!all(is.na(conditions))){
-            message(paste0('DE analysis of cell-type proportions'))
+        tot_expr = num(colSums(exprs(bulk)))/1e+06
+        N = dim(S_mat)[1]
+        G = dim(S_mat)[2]
+        K = dim(S_mat)[3]
+        pvals = array(rep(1, G * K), c(G, K))
+        padjs = array(rep(1, G * K), c(G, K))
+        fcs = array(rep(0, G * K), c(G, K))
+        pvals.N = array(rep(1, N * G * K), c(N, G, K))
+        padjs.N = array(rep(1, N * G * K), c(N, G, K))
+        fcs.N = array(rep(1, N * G * K), c(N, G, K))
+        ct.pvals = array(rep(1, K), c(K))
+        ct.padjs = array(rep(1, K), c(G, K))
+        ct.fcs = array(rep(0, K), c(K))
+        if (!all(is.na(conditions))) {
+            message(paste0("DE analysis of cell-type proportions"))
             colData = data.frame(condition = conditions, tot_expr = tot_expr)
-            # cell-type proportion comparison
-            w_k_per1000cells = round(t(1000*ct_prop))+1
-            dds.ct <- DESeqDataSetFromMatrix(countData = w_k_per1000cells, colData= colData, 
-                                              design =(~ tot_expr + condition)) 
-            dds.ct <- tryCatch( expr = { DESeq(dds.ct) },
-                    error=function(cond) {
-                        message("Error with DE analysis, using fit with mean instead")
-                        return(DESeq(dds.ct, fitType="mean"))
-                })
-            df_res.ct = results(dds.ct)[order(results(dds.ct)$pvalue, decreasing = F),]
+            w_k_per1000cells = round(t(1000 * ct_prop)) + 1
+            dds.ct <- DESeqDataSetFromMatrix(countData = w_k_per1000cells, 
+                colData = colData, design = (~tot_expr + condition))
+            dds.ct <- tryCatch(expr = {
+                DESeq(dds.ct)
+            }, error = function(cond) {
+                message("Error with DE analysis, using fit with mean instead")
+                return(DESeq(dds.ct, fitType = "mean"))
+            })
+            df_res.ct = results(dds.ct)[order(results(dds.ct)$pvalue, 
+                decreasing = F), ]
         }
-        for(k in 1:K){
-            message(paste0('DE analysis of cell-type ', dimnames(S_mat)[[3]][k]))
-            if(!all(is.na(conditions))){
-                message(paste0('DE analysis between two conditions: ', unique(conditions)[1], ' vs ', unique(conditions)[2]))
-                S_k = S_mat[,,k] 
-                w_k = ct_prop[,k]
-                if ( rankMatrix(S_k)[1] == 0 ){ message('matrix not full ranked, skipping cell-type') ; next }
-                colData = data.frame(condition = conditions, celltype_prop = w_k, tot_expr = tot_expr)
-                dds <- DESeqDataSetFromMatrix(countData = t(S_k)+1, colData= colData, 
-                                                  design =(~ tot_expr + celltype_prop + condition)) 
-                dds <- tryCatch( expr = { DESeq(dds) },
-                    error=function(cond) {
-                        message("Error with DE analysis, using fit with mean instead")
-                        return(DESeq(dds, fitType="mean"))
+        for (k in 1:K) {
+            message(paste0("DE analysis of cell-type ", dimnames(S_mat)[[3]][k]))
+            if (!all(is.na(conditions))) {
+                message(paste0("DE analysis between two conditions: ", 
+                  unique(conditions)[1], " vs ", unique(conditions)[2]))
+                S_k = S_mat[, , k]
+                w_k = ct_prop[, k]
+                if (rankMatrix(S_k)[1] == 0) {
+                  message("matrix not full ranked, skipping cell-type")
+                  next
+                }
+                colData = data.frame(condition = conditions, 
+                  celltype_prop = w_k, tot_expr = tot_expr)
+                dds <- DESeqDataSetFromMatrix(countData = t(S_k) + 
+                  1, colData = colData, design = (~tot_expr + 
+                  celltype_prop + condition))
+                dds <- tryCatch(expr = {
+                  DESeq(dds)
+                }, error = function(cond) {
+                  message("Error with DE analysis, using fit with mean instead")
+                  return(DESeq(dds, fitType = "mean"))
                 })
-                fcs[,k] = num(-1*results(dds, tidy=TRUE)$log2FoldChange)
-                pvals[,k] = num(results(dds, tidy=TRUE)$pvalue)
-                padjs[,k] = num(results(dds, tidy=TRUE)$padj)
+                fcs[, k] = num(-1 * results(dds, tidy = TRUE)$log2FoldChange)
+                pvals[, k] = num(results(dds, tidy = TRUE)$pvalue)
+                padjs[, k] = num(results(dds, tidy = TRUE)$padj)
             }
-            if(patient_specific_DE){
-                message('DE analysis per sample')
-                for(n in 1:N){
-                    cond_temp = conditions
-                    cond_temp[n] <- 'condition_n'
-                    sel.n = cond_temp != 'condition'
-                    conditions.n = cond_temp[sel.n]
-                    S_k.n = S_k[sel.n,]
-                    w_k.n = w_k[sel.n]
-                    if ( rankMatrix(S_k.n)[1] == 0 ){ message('matrix not full ranked, skipping cell-type') ; next }
-                    tot_expr.n = num(total_expr/1e6)[sel.n]
-                    colData = data.frame(condition = conditions.n, celltype_prop = w_k.n, tot_expr = tot_expr.n)
-                    dds <- DESeqDataSetFromMatrix(countData = t(S_k.n)+1, colData= colData, 
-                                                      design =(~ tot_expr + celltype_prop + condition)) #design =(~ celltype_prop + condition)
-                    dds <- DESeq(dds)
-                    dds <- tryCatch( expr = { DESeq(dds) },
-                        error=function(cond) {
-                            message("Error with DE analysis, using fit with mean instead")
-                            return(DESeq(dds, fitType="mean"))
-                    })
-                    fcs.N[n,,k] = num(-1*results(dds, tidy=TRUE)$log2FoldChange)
-                    pvals.N[n,,k] = num(results(dds, tidy=TRUE)$pvalue)
-                    padjs.N[n,,k] = num(results(dds, tidy=TRUE)$padj)
+            if (patient_specific_DE) {
+                message("DE analysis per sample")
+                for (n in 1:N) {
+                  cond_temp = conditions
+                  cond_temp[n] <- "condition_n"
+                  sel.n = cond_temp != "condition"
+                  conditions.n = cond_temp[sel.n]
+                  S_k.n = S_k[sel.n, ]
+                  w_k.n = w_k[sel.n]
+                  if (rankMatrix(S_k.n)[1] == 0) {
+                    message("matrix not full ranked, skipping cell-type")
+                    next
+                  }
+                  tot_expr.n = num(total_expr/1e+06)[sel.n]
+                  colData = data.frame(condition = conditions.n, 
+                    celltype_prop = w_k.n, tot_expr = tot_expr.n)
+                  dds <- DESeqDataSetFromMatrix(countData = t(S_k.n) + 
+                    1, colData = colData, design = (~tot_expr + 
+                    celltype_prop + condition))
+                  dds <- DESeq(dds)
+                  dds <- tryCatch(expr = {
+                    DESeq(dds)
+                  }, error = function(cond) {
+                    message("Error with DE analysis, using fit with mean instead")
+                    return(DESeq(dds, fitType = "mean"))
+                  })
+                  fcs.N[n, , k] = num(-1 * results(dds, tidy = TRUE)$log2FoldChange)
+                  pvals.N[n, , k] = num(results(dds, tidy = TRUE)$pvalue)
+                  padjs.N[n, , k] = num(results(dds, tidy = TRUE)$padj)
                 }
             }
         }
-        # btw condition DE analysis of gene expression 
-        log_pvals = array(-log10(pvals), c(G,K))
-        log_padj = array(-log10(padjs), c(G,K))
+        log_pvals = array(-log10(pvals), c(G, K))
+        log_padj = array(-log10(padjs), c(G, K))
         signif_pred = define_signif(padjs)
-        dimnames(pvals) = dimnames(log_pvals) = dimnames(padjs) = dimnames(log_padj) = dimnames(signif_pred) = dimnames(fcs) = dimnames(S_mat[1,,])
-        df_res = cbind(melt(pvals), melt(log_pvals)[,3], melt(padjs)[,3], 
-                      melt(log_padj)[,3], melt(fcs)[,3], melt(signif_pred)[,3])
-        colnames(df_res) = c('gene', 'celltype', 'pval', 'log10_pval', 'padj', 'log10_padj', 'log2_FC', 'signif')
-        df_res = df_res[order(df_res$log10_pval, decreasing = T),]
-        # per patient DE analysis of gene expression 
-        log_pvals.N = array(-log10(pvals.N), c(N,G,K))
-        log_padj.N = array(-log10(padjs.N), c(N,G,K))
+        dimnames(pvals) = dimnames(log_pvals) = dimnames(padjs) = dimnames(log_padj) = dimnames(signif_pred) = dimnames(fcs) = dimnames(S_mat[1, 
+            , ])
+        df_res = cbind(melt(pvals), melt(log_pvals)[, 3], melt(padjs)[, 
+            3], melt(log_padj)[, 3], melt(fcs)[, 3], melt(signif_pred)[, 
+            3])
+        colnames(df_res) = c("gene", "celltype", "pval", "log10_pval", 
+            "padj", "log10_padj", "log2_FC", "signif")
+        df_res = df_res[order(df_res$log10_pval, decreasing = T), 
+            ]
+        log_pvals.N = array(-log10(pvals.N), c(N, G, K))
+        log_padj.N = array(-log10(padjs.N), c(N, G, K))
         signif_pred.N = define_signif(padjs.N)
         dimnames(pvals.N) = dimnames(log_pvals.N) = dimnames(padjs.N) = dimnames(log_padj.N) = dimnames(signif_pred.N) = dimnames(fcs.N) = dimnames(S_mat)
-        df_res.N = cbind(melt(pvals.N), melt(log_pvals.N)[,4], melt(padjs.N)[,4], 
-                        melt(log_padj.N)[,4], melt(fcs.N)[,4], melt(signif_pred.N)[,4])
-        colnames(df_res.N) = c('sample', 'gene', 'celltype', 'pval', 'log10_pval', 'padj', 'log10_padj', 'log2_FC', 'signif')
-        df_res.N = df_res.N[order(df_res.N$log10_pval, decreasing = T),]
-        # make final list output
-        final_res$DE.expr.conditions = df_res ; final_res$DE.props.conditions = df_res.ct ; final_res$DE.expr.persample
+        df_res.N = cbind(melt(pvals.N), melt(log_pvals.N)[, 4], 
+            melt(padjs.N)[, 4], melt(log_padj.N)[, 4], melt(fcs.N)[, 
+                4], melt(signif_pred.N)[, 4])
+        colnames(df_res.N) = c("sample", "gene", "celltype", 
+            "pval", "log10_pval", "padj", "log10_padj", "log2_FC", 
+            "signif")
+        df_res.N = df_res.N[order(df_res.N$log10_pval, decreasing = T), 
+            ]
+        final_res$DE.expr.conditions = df_res
+        final_res$DE.props.conditions = df_res.ct
+        final_res$DE.expr.persample
     }
     return(final_res)
 }
