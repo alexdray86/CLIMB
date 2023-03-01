@@ -48,7 +48,7 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
         stopifnot(length(final_res)>0) 
     }
     num <- function(x) { return(as.numeric(as.character(x))) }
-    ct.props = list()
+    ct.props = list() ; ct.props.ba = list()
     ct.exprs = list()
     sc.mat = exprs(sc)
     cell_expr = colSums(exprs(sc))
@@ -93,12 +93,17 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
                 b_hat_n_posterior = sum(ppred[grepl(cancer_pattern, agg$celltype)])
                 message(paste0('Cancer cell ratio provided: ',b_n,', predicted prior to smooth norm: ',b_hat_n, ', corrected: ', b_hat_n_posterior))
                 names(ppred) = agg_norm$celltype
+                ct.props.ba[[i]] = ppred
+                ppred = (agg$sum_coefs)/sum(agg$sum_coefs)
+                names(ppred) = agg$celltype
                 ct.props[[i]] = ppred
+
             }
             else {
                 ppred = (agg$x)/sum(agg$x)
                 names(ppred) = agg$Group.1
                 ct.props[[i]] = ppred
+                ct.props.ba[[i]] = ppred
             }
             if (predict_expression) {
                 pcor_expr_pred = list()
@@ -120,6 +125,7 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
             save_ncoefs[[i]] = norm_coefs
         }
         final_res$props = do.call(rbind, ct.props)
+        final_res$props.ba = do.call(rbind, ct.props.ba)
         message("Cell-type abundance prediction done. ")
     }
     if (predict_expression) {
