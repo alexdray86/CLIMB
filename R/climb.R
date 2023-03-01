@@ -88,12 +88,11 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
                 agg_norm[!grepl(cancer_pattern, agg$celltype), ]$sum_coefs <- agg_norm[!grepl(cancer_pattern, 
                     agg$celltype), ]$sum_coefs * f_n_n
                 agg_norm$sum_coefs = num(agg_norm$sum_coefs)
-                agg_norm = agg_norm[match(levels(sc$cellType), agg_norm$celltype), 
-                    ]
+                agg_norm = agg_norm[match(levels(sc$cellType), agg_norm$celltype),]
                 ppred = (agg_norm$sum_coefs)/sum(agg_norm$sum_coefs)
                 b_hat_n_posterior = sum(ppred[grepl(cancer_pattern, agg$celltype)])
                 message(paste0('Cancer cell ratio provided: ',b_n,', predicted prior to smooth norm: ',b_hat_n, ', corrected: ', b_hat_n_posterior))
-                names(ppred) = agg_norm$Group.1
+                names(ppred) = agg_norm$celltype
                 ct.props[[i]] = ppred
             }
             else {
