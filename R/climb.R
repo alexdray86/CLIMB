@@ -75,6 +75,7 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
             }
             agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
             if (!is.na(sum(num(ratio_cancer_cells)))) {
+                message('Using cancer cell ratio for smooth normalization')
                 colnames(agg) = c("celltype", "sum_coefs")
                 b_n = num(ratio_cancer_cells[i])
                 b_hat_n = sum(agg[grepl(cancer_pattern, agg$celltype), 
@@ -90,6 +91,8 @@ climb <- function(sc, bulk, cancer_pattern = "*", mode = 'NA',
                 agg_norm = agg_norm[match(levels(sc$cellType), agg_norm$celltype), 
                     ]
                 ppred = (agg_norm$sum_coefs)/sum(agg_norm$sum_coefs)
+                b_hat_n_posterior = sum(ppred[grepl(cancer_pattern, agg$celltype)])
+                message(paste0('Cancer cell ratio provided: ',b_n,', predicted prior to smooth norm: ',b_hat_n, ', corrected: ', b_hat_n_posterior))
                 ct.props[[i]] = ppred
             }
             else {
