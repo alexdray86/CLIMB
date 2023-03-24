@@ -99,6 +99,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = FAL
                 coefs = coefs/cell_expr
             }
             agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
+            agg$x[is.na(agg$x)] <- 0 #in case a cell-type is not found
             if (!is.na(sum(num(ratio_cancer_cells)))) {
                 message("Using cancer cell ratio for smooth normalization")
                 colnames(agg) = c("celltype", "sum_coefs")
