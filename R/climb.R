@@ -74,6 +74,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = FAL
     cell_expr = colSums(exprs(sc))
     save_coefs = list()
     save_ncoefs = list()
+    sc$cellType = factor(sc$cellType)
     cellTypes = levels(sc$cellType)
     # Find common genes between bulk dataset and scRNA-seq
     common_genes = intersect(rownames(bulk), rownames(sc))
