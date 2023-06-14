@@ -13,7 +13,6 @@ biocViews:
 Imports:
         glmnet (>= 4.1-6),
         Biobase (>= 2.58.0),
-#DESeq2 (>= 1.38.3) 
 Depends: 
     R (>= 4.2.0)
 LazyData: true
