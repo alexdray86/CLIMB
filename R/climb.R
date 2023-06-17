@@ -8,6 +8,7 @@
 #' @param ratio_cancer_cells numeric vector, same size as number of mixtures. if we have data about the fraction of cancer cells present in mixture, this can improve deconvolution accuracy. If ratio_cancer_cells is provided, then CLIMB-BA method will be used. It is important that cancer cell-types in the scRNA-seq dataset contains the pattern "-like" to be recognized as cancer cells.
 #' @param norm_coefs boolean indicating whether coefficients should be normalized by total RNA content
 #' @param dwls_weights boolean indicating whether a 2-pass procedure should be applied, with DWLS-like gene-specific weights applied on the 2nd pass.
+#' @param verbose boolean indicating whether to print message during running
 #' @param up.lim numeric scalar, impose a l-infinity norm to the linear model (upper bound for coefficient)
 #' @param lambda Regularization factor
 #' @param norm_factor if ratio_cancer_cells is provided, indicate strength of smooth normalization
@@ -22,13 +23,13 @@
 #' @param min_common_genes minimum number of genes to be in common between bulk and scRNA-seq datsets 
 #' @export
 climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRUE, dwls_weights=TRUE,
-    ratio_cancer_cells = NA, up.lim = Inf, lambda = 0, norm_factor = 0.1, 
+    ratio_cancer_cells = NA, up.lim = Inf, lambda = 0, norm_factor = 0.1, verbose=TRUE,
     conditions = NA, predict_abundance = TRUE, predict_expression = TRUE, 
     DE_analysis = FALSE, patient_specific_DE = FALSE, final_res = list(), 
     min_common_genes = 100) 
 {
     if (mode == "all") {
-        message("ALL mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions")
+        if(verbose){message("ALL mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions")}
         predict_abundance = TRUE
         predict_expression = TRUE
         DE_analysis = TRUE
@@ -36,29 +37,29 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
         stopifnot(!all(is.na(conditions)))
     }
     if (mode == "all+") {
-        message("ALL+ mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions if provided AND at sample level")
-        message("WARNING: sample-level DE can take long!")
+        if(verbose){message("ALL+ mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions if provided AND at sample level")}
+        if(verbose){message("WARNING: sample-level DE can take long!")}
         predict_abundance = TRUE
         predict_expression = TRUE
         DE_analysis = TRUE
         patient_specific_DE = TRUE
     }
     if (mode == "abundance") {
-        message("ABUNDANCE mode: predicting cell-type proportions in bulks")
+        if(verbose){message("ABUNDANCE mode: predicting cell-type proportions in bulks")}
         predict_abundance = TRUE
         predict_expression = FALSE
         DE_analysis = FALSE
         patient_specific_DE = FALSE
     }
     if (mode == "expression") {
-        message("EXPRESSION mode: predicting cell-type expression in bulks - requires single-cell coefficients fitted by CLIMB")
+        if(verbose){message("EXPRESSION mode: predicting cell-type expression in bulks - requires single-cell coefficients fitted by CLIMB")}
         predict_abundance = TRUE
         predict_expression = TRUE
         DE_analysis = FALSE
         patient_specific_DE = FALSE
     }
     if (mode == "DE.only") {
-        message("Running DE analysis based on existing CLIMB object")
+        if(verbose){message("Running DE analysis based on existing CLIMB object")}
         predict_abundance = FALSE
         predict_expression = FALSE
         DE_analysis = TRUE
@@ -78,7 +79,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
     sc$cellType = factor(sc$cellType)
     cellTypes = levels(sc$cellType)
     common_genes = intersect(rownames(bulk), rownames(sc))
-    message(paste0(length(common_genes), " common genes found between scRNA-seq refererence and bulk datasets"))
+    if(verbose){message(paste0(length(common_genes), " common genes found between scRNA-seq refererence and bulk datasets"))}
     if (length(common_genes) < min_common_genes) {
         stop("too few genes found between scRNA-seq refererence and bulk dataset")
     }
@@ -90,7 +91,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
     K = length(cellTypes)
     S_pred_mapping_n = array(rep(0, N * G * K), c(N, G, K))
     if (predict_abundance) {
-        message("Bulk to single-cell mapping for prediction of cell-type abundance")
+        if(verbose){message("Bulk to single-cell mapping for prediction of cell-type abundance")}
         for (i in 1:N) {
             y = num(exprs(bulk)[, i])
             # CLIMB first pass
@@ -111,7 +112,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
             agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
             agg$x[is.na(agg$x)] <- 0
             if (!is.na(sum(num(ratio_cancer_cells)))) {
-                message("Using cancer cell ratio for smooth normalization")
+                if(verbose){message("Using cancer cell ratio for smooth normalization")}
                 colnames(agg) = c("celltype", "sum_coefs")
                 b_n = num(ratio_cancer_cells[i])
                 b_hat_n = sum(agg[grepl(cancer_pattern, agg$celltype), 
@@ -132,9 +133,9 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
                 ppred = (agg_norm$sum_coefs)/sum(agg_norm$sum_coefs)
                 b_hat_n_posterior = sum(ppred[grepl(cancer_pattern, 
                   agg$celltype)])
-                message(paste0("Cancer cell ratio provided: ", 
+                if(verbose){message(paste0("Cancer cell ratio provided: ", 
                   b_n, ", predicted prior to smooth norm: ", 
-                  b_hat_n, ", corrected: ", b_hat_n_posterior))
+                  b_hat_n, ", corrected: ", b_hat_n_posterior))}
                 names(ppred) = agg_norm$celltype
                 ct.props.ba[[i]] = ppred
                 ppred = (agg$sum_coefs)/sum(agg$sum_coefs)
@@ -168,10 +169,10 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
         }
         final_res$props = do.call(rbind, ct.props)
         final_res$props.ba = do.call(rbind, ct.props.ba)
-        message("Cell-type abundance prediction done. ")
+        if(verbose){message("Cell-type abundance prediction done. ")}
     }
     if (predict_expression) {
-        message("Starting high-resolution expression deconvolution")
+        if(verbose){message("Starting high-resolution expression deconvolution")}
         normal_sel = !grepl(cancer_pattern, sc$cellType)
         cancer_sel = grepl(cancer_pattern, sc$cellType)
         cancer_ct_sel = grepl(cancer_pattern, cellTypes)
@@ -205,8 +206,8 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
                 S_pred_n[n, g, ] = rep(0, K)
             }
             if (g%%1000 == 0) {
-                message(paste0("High-Resolution expression prediction: ", 
-                  g, " genes processed..."))
+                if(verbose){message(paste0("High-Resolution expression prediction: ", 
+                  g, " genes processed..."))}
             }
         }
         dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
@@ -224,7 +225,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
         DE_analysis = TRUE
     }
     if (DE_analysis == TRUE) {
-        message("Starting DE analysis")
+        if(verbose){message("Starting DE analysis")}
         define_signif <- function(p_) {
             signif_p_ = p_
             signif_p_[p_ < 0.05] = "*"
@@ -250,7 +251,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
         ct.padjs = array(rep(1, K), c(G, K))
         ct.fcs = array(rep(0, K), c(K))
         if (!all(is.na(conditions))) {
-            message(paste0("DE analysis of cell-type proportions"))
+            if(verbose){message(paste0("DE analysis of cell-type proportions"))}
             colData = data.frame(condition = conditions, tot_expr = tot_expr)
             w_k_per1000cells = round(t(1000 * ct_prop)) + 1
             dds.ct <- DESeqDataSetFromMatrix(countData = w_k_per1000cells, 
@@ -258,21 +259,21 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
             dds.ct <- tryCatch(expr = {
                 DESeq(dds.ct)
             }, error = function(cond) {
-                message("Error with DE analysis, using fit with mean instead")
+                if(verbose){message("Error with DE analysis, using fit with mean instead")}
                 return(DESeq(dds.ct, fitType = "mean"))
             })
             df_res.ct = results(dds.ct)[order(results(dds.ct)$pvalue, 
                 decreasing = F), ]
         }
         for (k in 1:K) {
-            message(paste0("DE analysis of cell-type ", dimnames(S_mat)[[3]][k]))
+            if(verbose){message(paste0("DE analysis of cell-type ", dimnames(S_mat)[[3]][k]))}
             if (!all(is.na(conditions))) {
-                message(paste0("DE analysis between two conditions: ", 
-                  unique(conditions)[1], " vs ", unique(conditions)[2]))
+                if(verbose){message(paste0("DE analysis between two conditions: ",
+                  unique(conditions)[1], " vs ", unique(conditions)[2]))}
                 S_k = S_mat[, , k]
                 w_k = ct_prop[, k]
                 if (rankMatrix(S_k)[1] == 0) {
-                  message("matrix not full ranked, skipping cell-type")
+                  if(verbose){message("matrix not full ranked, skipping cell-type")}
                   next
                 }
                 colData = data.frame(condition = conditions, 
@@ -283,7 +284,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
                 dds <- tryCatch(expr = {
                   DESeq(dds)
                 }, error = function(cond) {
-                  message("Error with DE analysis, using fit with mean instead")
+                  if(verbose){message("Error with DE analysis, using fit with mean instead")}
                   return(DESeq(dds, fitType = "mean"))
                 })
                 fcs[, k] = num(-1 * results(dds, tidy = TRUE)$log2FoldChange)
@@ -291,7 +292,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
                 padjs[, k] = num(results(dds, tidy = TRUE)$padj)
             }
             if (patient_specific_DE) {
-                message("DE analysis per sample")
+                if(verbose){message("DE analysis per sample")}
                 for (n in 1:N) {
                   cond_temp = conditions
                   cond_temp[n] <- "condition_n"
@@ -300,7 +301,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
                   S_k.n = S_k[sel.n, ]
                   w_k.n = w_k[sel.n]
                   if (rankMatrix(S_k.n)[1] == 0) {
-                    message("matrix not full ranked, skipping cell-type")
+                    if(verbose){message("matrix not full ranked, skipping cell-type")}
                     next
                   }
                   tot_expr.n = num(total_expr/1e+06)[sel.n]
@@ -313,7 +314,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
                   dds <- tryCatch(expr = {
                     DESeq(dds)
                   }, error = function(cond) {
-                    message("Error with DE analysis, using fit with mean instead")
+                    if(verbose){message("Error with DE analysis, using fit with mean instead")}
                     return(DESeq(dds, fitType = "mean"))
                   })
                   fcs.N[n, , k] = num(-1 * results(dds, tidy = TRUE)$log2FoldChange)
