@@ -7,6 +7,7 @@
 #' @param bulk ExpressionSet object containing the mixtures to be deconvoluted
 #' @param ratio_cancer_cells numeric vector, same size as number of mixtures. if we have data about the fraction of cancer cells present in mixture, this can improve deconvolution accuracy. If ratio_cancer_cells is provided, then CLIMB-BA method will be used. It is important that cancer cell-types in the scRNA-seq dataset contains the pattern "-like" to be recognized as cancer cells.
 #' @param norm_coefs boolean indicating whether coefficients should be normalized by total RNA content
+#' @param dwls_weights boolean indicating whether a 2-pass procedure should be applied, with DWLS-like gene-specific weights applied on the 2nd pass.
 #' @param up.lim numeric scalar, impose a l-infinity norm to the linear model (upper bound for coefficient)
 #' @param lambda Regularization factor
 #' @param norm_factor if ratio_cancer_cells is provided, indicate strength of smooth normalization
@@ -20,10 +21,10 @@
 #' @param final_res previous CLIMB result to use for DE analysis.
 #' @param min_common_genes minimum number of genes to be in common between bulk and scRNA-seq datsets 
 #' @export
-climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = FALSE, 
+climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRUE, dwls_weights=TRUE,
     ratio_cancer_cells = NA, up.lim = Inf, lambda = 0, norm_factor = 0.1, 
     conditions = NA, predict_abundance = TRUE, predict_expression = TRUE, 
-    DE_analysis = FALSE, patient_specific_DE = FALSE, final_res = list(),
+    DE_analysis = FALSE, patient_specific_DE = FALSE, final_res = list(), 
     min_common_genes = 100) 
 {
     if (mode == "all") {
@@ -76,13 +77,13 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = FAL
     save_ncoefs = list()
     sc$cellType = factor(sc$cellType)
     cellTypes = levels(sc$cellType)
-    # Find common genes between bulk dataset and scRNA-seq
     common_genes = intersect(rownames(bulk), rownames(sc))
     message(paste0(length(common_genes), " common genes found between scRNA-seq refererence and bulk datasets"))
-    if( length(common_genes) < min_common_genes ){
-        stop('too few genes found between scRNA-seq refererence and bulk dataset')
+    if (length(common_genes) < min_common_genes) {
+        stop("too few genes found between scRNA-seq refererence and bulk dataset")
     }
     sc = sc[common_genes, ]
+    scmat = exprs(sc)
     bulk = bulk[common_genes, ]
     N = dim(bulk)[2]
     G = dim(bulk)[1]
@@ -91,16 +92,24 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = FAL
     if (predict_abundance) {
         message("Bulk to single-cell mapping for prediction of cell-type abundance")
         for (i in 1:N) {
-            sc.mat.sub = exprs(sc)
             y = num(exprs(bulk)[, i])
-            fit = glmnet(sc.mat.sub, y, lower.limits = 0, upper.limits = up.lim, 
-                lambda = lambda)
+            # CLIMB first pass
+            fit = glmnet(scmat, y, lower.limits = 0, upper.limits = up.lim, standardize=T)
             coefs = coef(fit)[-1, dim(coef(fit))[2]]
-            if (norm_coefs) {
-                coefs = coefs/cell_expr
+            if (dwls_weights){
+                # Implement DWLS-like weights using single-cell expression matrix
+                alpha_tilde_tm1 = coefs/(sum(coefs))
+                weights_tm1 = 1 / (scmat %*% num(alpha_tilde_tm1))^2
+                weights_tm1[weights_tm1 == Inf] <- max(weights_tm1[weights_tm1 != Inf])
+                q_weights_tm1 = quantile(weights_tm1, probs = seq(0,1,0.01))
+                weights_tm1[weights_tm1 > q_weights_tm1[95]] <- q_weights_tm1[95]
+                # Run second pass of CLIMB
+                fit = glmnet(scmat, y, standardize = T, lower.limits = 0.0, lambda=0.0, weights = weights_tm1)
+                coefs = coef(fit)[-1,dim(coef(fit))[2]]
             }
+            if (norm_coefs) { coefs = coefs / cell_expr }
             agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
-            agg$x[is.na(agg$x)] <- 0 #in case a cell-type is not found
+            agg$x[is.na(agg$x)] <- 0
             if (!is.na(sum(num(ratio_cancer_cells)))) {
                 message("Using cancer cell ratio for smooth normalization")
                 colnames(agg) = c("celltype", "sum_coefs")
@@ -342,4 +351,4 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = FAL
         final_res$DE.expr.persample
     }
     return(final_res)
-}
+} 
