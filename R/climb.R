@@ -94,10 +94,10 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
         if(verbose){message("Bulk to single-cell mapping for prediction of cell-type abundance")}
         for (i in 1:N) {
             y = num(exprs(bulk)[, i])
-            # CLIMB first pass
-            fit = glmnet(scmat, y, lower.limits = 0, upper.limits = up.lim, standardize=T)
-            coefs = coef(fit)[-1, dim(coef(fit))[2]]
             if (dwls_weights){
+                # CLIMB first pass
+                fit = glmnet(scmat, y, lower.limits = 0, upper.limits = up.lim, standardize=T)
+                coefs = coef(fit)[-1, dim(coef(fit))[2]]
                 # Implement DWLS-like weights using single-cell expression matrix
                 alpha_tilde_tm1 = coefs/(sum(coefs))
                 weights_tm1 = 1 / (scmat %*% num(alpha_tilde_tm1))^2
@@ -107,6 +107,10 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
                 # Run second pass of CLIMB
                 fit = glmnet(scmat, y, standardize = T, lower.limits = 0.0, lambda=0.0, weights = weights_tm1)
                 coefs = coef(fit)[-1,dim(coef(fit))[2]]
+            } else {
+                # CLIMB one-pass original (no weights)
+                fit = glmnet(scmat, y, lower.limits = 0.0, lambda=0.0, upper.limits = up.lim, standardize=T)
+                coefs = coef(fit)[-1, dim(coef(fit))[2]]
             }
             if (norm_coefs) { coefs = coefs / cell_expr }
             agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
