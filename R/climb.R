@@ -159,7 +159,7 @@ climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRU
                 for (k in 1:length(all_celltypes)) {
                   this_ct = all_celltypes[k]
                   sel_ct = sc$cellType == this_ct
-                  pred_expr = (t(coefs)[sel_ct] %*% t(sc.mat[, 
+                  pred_expr = (t(coefs)[sel_ct] %*% t(scmat[, 
                     sel_ct]))
                   pred_expr[is.na(pred_expr)] = 0
                   pred_exprs[[k]] = pred_expr
