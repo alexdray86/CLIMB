@@ -90,7 +90,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
     K = length(cellTypes)
     S_pred_mapping_n = array(rep(0, N * G * K), c(N, G, K))
     if (predict_abundance) {
-        if(verbose){message("Bulk to single-cell mapping for prediction of cell-type abundance")}
+        if(verbose){message("Bulk to single-cell mapping for prediction of cell-type abundance / expression")}
         for (i in 1:N) {
             y = num(exprs(bulk)[, i])
             if (dwls_weights){
@@ -145,8 +145,9 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
             dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
             dimnames(S_pred_mapping_n)[[3]] = cellTypes
-            final_res$expr.pred = S_pred_mapping_n
+            final_res$expr.highres = S_pred_mapping_n
             final_res$expr.mapping = S_pred_mapping_n
+            final_res$expr.overall = colSums(S_pred_mapping_n, dims = 1) 
             final_res$coefs = save_coefs
         } else {
             normal_sel = !grepl(cancer_pattern, sc$cellType)
@@ -189,13 +190,16 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
             dimnames(S_pred_n)[[2]] = dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
             dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
-            final_res$expr.pred = S_pred_n
+            final_res$expr.highres = S_pred_n
             final_res$expr.mapping = S_pred_mapping_n
+            final_res$expr.overall = colSums(S_pred_mapping_n, dims = 1)
             final_res$coefs = save_coefs
         }
     }
     else {
+        final_res$expr.highres = S_pred_mapping_n
         final_res$expr.mapping = S_pred_mapping_n
+        final_res$expr.overall = colSums(S_pred_mapping_n, dims = 1) 
         final_res$coefs = save_coefs
     }
     if (!all(is.na(conditions))) {
