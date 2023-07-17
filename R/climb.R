@@ -22,7 +22,7 @@
 #' @param final_res previous CLIMB result to use for DE analysis.
 #' @param min_common_genes minimum number of genes to be in common between bulk and scRNA-seq datsets 
 #' @export
-climb <- function (sc, bulk, cancer_pattern = "*", mode = "NA", norm_coefs = TRUE, dwls_weights=TRUE,
+climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_coefs = TRUE, dwls_weights=TRUE,
     ratio_cancer_cells = NA, up.lim = Inf, lambda = 0, norm_factor = 0.1, verbose=TRUE,
     conditions = NA, predict_abundance = TRUE, predict_expression = TRUE, 
     DE_analysis = FALSE, patient_specific_DE = FALSE, final_res = list(), 
