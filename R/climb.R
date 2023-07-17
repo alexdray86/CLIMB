@@ -142,6 +142,15 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
     if (predict_expression) {
         if(verbose){message("Starting high-resolution expression deconvolution")}
         if ( cancer_pattern == 'none' ){
+            for (g in 1:G) {
+                for (n in 1:N) {
+                    S_pred_mapping_n[n, g, ] = ct.exprs[[n]][,g]
+                }
+                if (g%%1000 == 0) {
+                    if(verbose){message(paste0("High-Resolution expression prediction: ", 
+                      g, " genes processed..."))}
+                }
+            }
             dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
             dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
             dimnames(S_pred_mapping_n)[[3]] = cellTypes
