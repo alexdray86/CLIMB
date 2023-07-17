@@ -70,7 +70,6 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
         return(as.numeric(as.character(x)))
     }
     ct.props = list()
-    ct.props.ba = list()
     ct.exprs = list()
     sc.mat = exprs(sc)
     cell_expr = colSums(exprs(sc))
@@ -115,43 +114,9 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             if (norm_coefs) { coefs = coefs / cell_expr }
             agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
             agg$x[is.na(agg$x)] <- 0
-            if (!is.na(sum(num(ratio_cancer_cells)))) {
-                if(verbose){message("Using cancer cell ratio for smooth normalization")}
-                colnames(agg) = c("celltype", "sum_coefs")
-                b_n = num(ratio_cancer_cells[i])
-                b_hat_n = sum(agg[grepl(cancer_pattern, agg$celltype), 
-                  ]$sum_coefs)/sum(agg$sum_coefs)
-                f_n = (b_n + norm_factor)/(b_hat_n + norm_factor)
-                f_n_n = (1 - b_n + norm_factor)/(1 - b_hat_n + 
-                  norm_factor)
-                agg_norm = agg
-                agg_norm[grepl(cancer_pattern, agg$celltype), 
-                  ]$sum_coefs <- agg_norm[grepl(cancer_pattern, 
-                  agg$celltype), ]$sum_coefs * f_n
-                agg_norm[!grepl(cancer_pattern, agg$celltype), 
-                  ]$sum_coefs <- agg_norm[!grepl(cancer_pattern, 
-                  agg$celltype), ]$sum_coefs * f_n_n
-                agg_norm$sum_coefs = num(agg_norm$sum_coefs)
-                agg_norm = agg_norm[match(levels(sc$cellType), 
-                  agg_norm$celltype), ]
-                ppred = (agg_norm$sum_coefs)/sum(agg_norm$sum_coefs)
-                b_hat_n_posterior = sum(ppred[grepl(cancer_pattern, 
-                  agg$celltype)])
-                if(verbose){message(paste0("Cancer cell ratio provided: ", 
-                  b_n, ", predicted prior to smooth norm: ", 
-                  b_hat_n, ", corrected: ", b_hat_n_posterior))}
-                names(ppred) = agg_norm$celltype
-                ct.props.ba[[i]] = ppred
-                ppred = (agg$sum_coefs)/sum(agg$sum_coefs)
-                names(ppred) = agg$celltype
-                ct.props[[i]] = ppred
-            }
-            else {
-                ppred = (agg$x)/sum(agg$x)
-                names(ppred) = agg$Group.1
-                ct.props[[i]] = ppred
-                ct.props.ba[[i]] = ppred
-            }
+            ppred = (agg$x)/sum(agg$x)
+            names(ppred) = agg$Group.1
+            ct.props[[i]] = ppred
             if (predict_expression) {
                 pcor_expr_pred = list()
                 all_celltypes = levels(sc$cellType)
@@ -172,54 +137,62 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             save_ncoefs[[i]] = norm_coefs
         }
         final_res$props = do.call(rbind, ct.props)
-        final_res$props.ba = do.call(rbind, ct.props.ba)
         if(verbose){message("Cell-type abundance prediction done. ")}
     }
     if (predict_expression) {
         if(verbose){message("Starting high-resolution expression deconvolution")}
-        normal_sel = !grepl(cancer_pattern, sc$cellType)
-        cancer_sel = grepl(cancer_pattern, sc$cellType)
-        cancer_ct_sel = grepl(cancer_pattern, cellTypes)
-        alpha_overal = do.call(rbind, save_coefs)
-        alpha_cancer = do.call(rbind, save_coefs)[, cancer_sel]
-        sc.cancer = sc[, cancer_sel]
-        C_overal = exprs(sc)
-        Y_hat_overal = alpha_overal %*% t(C_overal)
-        Y_true_bulk = t(exprs(bulk))
-        Epsilon_ng = Y_true_bulk - Y_hat_overal
-        S_pred_n = array(rep(0, N * G * K), c(N, G, K))
-        for (g in 1:G) {
-            Epsilon_g = num(Epsilon_ng[, g])
-            if (sd(Epsilon_g) != 0) {
-                fit = glmnet(alpha_cancer, Epsilon_g, intercept = TRUE)
-                C_diff_cancer = num(coef(fit)[-1, dim(coef(fit))[2]])
-                for (n in 1:N) {
-                  Epsilon_cancer_n = aggregate(C_diff_cancer * 
-                    alpha_cancer[n, ], list(sc.cancer$cellType), 
-                    sum)$x
-                  Epsilon_n = rep(0, K)
-                  Epsilon_n[cancer_ct_sel] = Epsilon_cancer_n
-                  S_pred_mapping_n[n, g, ] = ct.exprs[[n]][, 
-                    g]
-                  S_pred_n[n, g, ] = S_pred_mapping_n[n, g, ] + 
-                    Epsilon_n
-                  S_pred_n[n, g, ][S_pred_n[n, g, ] < 0] = 0
+        if ( cancer_pattern == 'none' ){
+            dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
+            dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
+            dimnames(S_pred_mapping_n)[[3]] = cellTypes
+            final_res$expr.pred = S_pred_mapping_n
+            final_res$expr.mapping = S_pred_mapping_n
+            final_res$coefs = save_coefs
+        } else {
+            normal_sel = !grepl(cancer_pattern, sc$cellType)
+            cancer_sel = grepl(cancer_pattern, sc$cellType)
+            cancer_ct_sel = grepl(cancer_pattern, cellTypes)
+            alpha_overal = do.call(rbind, save_coefs)
+            alpha_cancer = do.call(rbind, save_coefs)[, cancer_sel]
+            sc.cancer = sc[, cancer_sel]
+            C_overal = exprs(sc)
+            Y_hat_overal = alpha_overal %*% t(C_overal)
+            Y_true_bulk = t(exprs(bulk))
+            Epsilon_ng = Y_true_bulk - Y_hat_overal
+            S_pred_n = array(rep(0, N * G * K), c(N, G, K))
+            for (g in 1:G) {
+                Epsilon_g = num(Epsilon_ng[, g])
+                if (sd(Epsilon_g) != 0) {
+                    fit = glmnet(alpha_cancer, Epsilon_g, intercept = TRUE)
+                    C_diff_cancer = num(coef(fit)[-1, dim(coef(fit))[2]])
+                    for (n in 1:N) {
+                      Epsilon_cancer_n = aggregate(C_diff_cancer * 
+                        alpha_cancer[n, ], list(sc.cancer$cellType), 
+                        sum)$x
+                      Epsilon_n = rep(0, K)
+                      Epsilon_n[cancer_ct_sel] = Epsilon_cancer_n
+                      S_pred_mapping_n[n, g, ] = ct.exprs[[n]][, 
+                        g]
+                      S_pred_n[n, g, ] = S_pred_mapping_n[n, g, ] + 
+                        Epsilon_n
+                      S_pred_n[n, g, ][S_pred_n[n, g, ] < 0] = 0
+                    }
+                }
+                else {
+                    S_pred_n[n, g, ] = rep(0, K)
+                }
+                if (g%%1000 == 0) {
+                    if(verbose){message(paste0("High-Resolution expression prediction: ", 
+                      g, " genes processed..."))}
                 }
             }
-            else {
-                S_pred_n[n, g, ] = rep(0, K)
-            }
-            if (g%%1000 == 0) {
-                if(verbose){message(paste0("High-Resolution expression prediction: ", 
-                  g, " genes processed..."))}
-            }
+            dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
+            dimnames(S_pred_n)[[2]] = dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
+            dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
+            final_res$expr.pred = S_pred_n
+            final_res$expr.mapping = S_pred_mapping_n
+            final_res$coefs = save_coefs
         }
-        dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
-        dimnames(S_pred_n)[[2]] = dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
-        dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
-        final_res$expr.pred = S_pred_n
-        final_res$expr.mapping = S_pred_mapping_n
-        final_res$coefs = save_coefs
     }
     else {
         final_res$expr.mapping = S_pred_mapping_n
