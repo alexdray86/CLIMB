@@ -74,7 +74,6 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
     sc.mat = exprs(sc)
     cell_expr = colSums(exprs(sc))
     save_coefs = list()
-    save_ncoefs = list()
     sc$cellType = factor(sc$cellType)
     cellTypes = levels(sc$cellType)
     common_genes = intersect(rownames(bulk), rownames(sc))
@@ -134,7 +133,6 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
                 ct.exprs[[i]] = ct_exprs_pred
             }
             save_coefs[[i]] = coefs
-            save_ncoefs[[i]] = norm_coefs
         }
         final_res$props = do.call(rbind, ct.props)
         if(verbose){message("Cell-type abundance prediction done. ")}
