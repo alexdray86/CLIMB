@@ -170,7 +170,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             for (g in 1:G) {
                 Epsilon_g = num(Epsilon_ng[, g])
                 if (sd(Epsilon_g) != 0) {
-                    fit = glmnet(alpha_cancer, Epsilon_g, intercept = TRUE, alpha=0)
+                    fit = glmnet(alpha_cancer, Epsilon_g, intercept = TRUE)
                     C_diff_cancer = num(coef(fit)[-1, dim(coef(fit))[2]])
                     for (n in 1:N) {
                       Epsilon_cancer_n = aggregate(C_diff_cancer * 
