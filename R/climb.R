@@ -144,10 +144,6 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
                 for (n in 1:N) {
                     S_pred_mapping_n[n, g, ] = ct.exprs[[n]][,g]
                 }
-                if (g%%1000 == 0) {
-                    if(verbose){message(paste0("High-Resolution expression prediction: ", 
-                      g, " genes processed..."))}
-                }
             }
             dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
             dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
