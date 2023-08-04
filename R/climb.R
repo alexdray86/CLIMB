@@ -95,9 +95,9 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             if (dwls_weights){
                 # CLIMB first pass
                 fit = glmnet(scmat, y, lower.limits = 0, upper.limits = up.lim, standardize=T)
-                coefs = coef(fit)[-1, dim(coef(fit))[2]]
+                coefs_ = coef(fit)[-1, dim(coef(fit))[2]]
                 # Implement DWLS-like weights using single-cell expression matrix
-                alpha_tilde_tm1 = coefs/(sum(coefs))
+                alpha_tilde_tm1 = coefs_/(sum(coefs_))
                 weights_tm1 = 1 / (scmat %*% num(alpha_tilde_tm1))^2
                 weights_tm1[weights_tm1 == Inf] <- max(weights_tm1[weights_tm1 != Inf])
                 q_weights_tm1 = quantile(weights_tm1, probs = seq(0,1,0.01))
@@ -108,7 +108,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             } else {
                 # CLIMB one-pass original (no weights)
                 fit = glmnet(scmat, y, lower.limits = 0.0, lambda=0.0, upper.limits = up.lim, standardize=T)
-                coefs = coef(fit)[-1, dim(coef(fit))[2]]
+                coefs = coef(fit)[-1, dim(coef(fit))[2]] ; coefs_ = coefs
             }
             if (norm_coefs) { coefs = coefs / cell_expr }
             agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
@@ -123,7 +123,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
                 for (k in 1:length(all_celltypes)) {
                   this_ct = all_celltypes[k]
                   sel_ct = sc$cellType == this_ct
-                  pred_expr = (t(coefs)[sel_ct] %*% t(scmat[, 
+                  pred_expr = (t(coefs_)[sel_ct] %*% t(scmat[, 
                     sel_ct]))
                   pred_expr[is.na(pred_expr)] = 0
                   pred_exprs[[k]] = pred_expr
