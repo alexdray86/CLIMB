@@ -83,6 +83,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
     }
     ct.props = list()
     ct.exprs = list()
+    final_res = list()
     sc.mat = exprs(sc)
     cell_expr = colSums(exprs(sc))
     save_coefs = list()
