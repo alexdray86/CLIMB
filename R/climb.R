@@ -138,6 +138,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
         }
         climb_props.init = do.call(rbind, ct.props)
         rownames(climb_props.init)=colnames(bulk)
+        colnames(climb_props.init)=levels(sc$cellType)
         final_res$props.init = climb_props.init
         if (verbose) {
             message("First pass of cell-type abundance prediction done. Start second pass...")
@@ -261,6 +262,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
         }
         climb_props.corrected = do.call(rbind, ct.props)
         rownames(climb_props.corrected)=colnames(bulk)
+        colnames(climb_props.corrected)=levels(sc$cellType)
         final_res$props.corrected = climb_props.corrected
         if (verbose) {
             message("Second pass is done. Cell-type abundance prediction is over.")
