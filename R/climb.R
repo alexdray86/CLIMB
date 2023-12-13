@@ -16,20 +16,22 @@
 #' @param mode indicate which mode to use between: ['all'] run bulk deconvolution of cell-type proportions - cell-type expression - and differential expression analysis (without per sample DE analysis). ['all+'] same as 'all' but adds per-sample DE analysis (takes long time to run). ['abundance'] only performs cell-type proportions inference. ['expression'] performs cell-type proportions together with cell-type expression prediction.
 #' @param predict_abundance boolean indicating whether cell-type proportions should be assessed. This needs to be true for cell-type expression prediction to run.
 #' @param predict_expression boolean indicating whether cell-type expression should be predicted (takes longer to run)
-#' @param DE_analysis boolean indicating whether to perform DE analysis between two conditions. Requires the vector 'conditions' to be given as input.
-#' @param conditions vector associated with each bulk samples. Should be the same size as the number of bulks, and should contains two values only: 'condition' and 'control'. For instance, disease samples (condition) versus healthy (control), or KO samples (condition) versus wild type (control).
-#' @param patient_specific_DE boolean indicating whether to perform DE for each sample individually. In that case, each sample will be compared to the 'control' group in the vector 'conditions'. If no vector conditions is provided, every other samples will be used as control samples. 
-#' @param final_res previous CLIMB result to use for DE analysis.
 #' @param min_common_genes minimum number of genes to be in common between bulk and scRNA-seq datsets 
+#' @param n.top_var.genes number of variable genes to consider for the embirical bayes sampling of cells in reference 
+#' @param ratio_cell_increase percentage increase at each step of the embirical bayes procedure
+#' @param n.iter.subsampling number of subsampling that will be performed on the single-cell reference (results from each subsample are then averaged) 
+#' @param min.n.cells minimum number of cells per cell type to subsample. If a cell type has less cells in reference, then sampling is done with replacement.
 #' @export
-climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_coefs = TRUE, dwls_weights=TRUE,
-    ratio_cancer_cells = NA, up.lim = Inf, lambda = 0, norm_factor = 0.1, verbose=TRUE,
+climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", 
+    up.lim = Inf, lambda = 0, norm_factor = 0.1, verbose = TRUE, 
     conditions = NA, predict_abundance = TRUE, predict_expression = TRUE, 
-    DE_analysis = FALSE, patient_specific_DE = FALSE, final_res = list(), 
-    min_common_genes = 100) 
+    min_common_genes = 100, n.top_var.genes=3000, n.top_mean.genes=1000, 
+    ratio_cell_increase=0.02, n.iter.subsampling=5, min.n.cells=75) 
 {
     if (mode == "all") {
-        if(verbose){message("ALL mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions")}
+        if (verbose) {
+            message("ALL mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions")
+        }
         predict_abundance = TRUE
         predict_expression = TRUE
         DE_analysis = TRUE
@@ -37,29 +39,39 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
         stopifnot(!all(is.na(conditions)))
     }
     if (mode == "all+") {
-        if(verbose){message("ALL+ mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions if provided AND at sample level")}
-        if(verbose){message("WARNING: sample-level DE can take long!")}
+        if (verbose) {
+            message("ALL+ mode: prediction of cell-type abundance / high-resolution cell-type expression / DE analysis between conditions if provided AND at sample level")
+        }
+        if (verbose) {
+            message("WARNING: sample-level DE can take long!")
+        }
         predict_abundance = TRUE
         predict_expression = TRUE
         DE_analysis = TRUE
         patient_specific_DE = TRUE
     }
     if (mode == "abundance") {
-        if(verbose){message("ABUNDANCE mode: predicting cell-type proportions in bulks")}
+        if (verbose) {
+            message("ABUNDANCE mode: predicting cell-type proportions in bulks")
+        }
         predict_abundance = TRUE
         predict_expression = FALSE
         DE_analysis = FALSE
         patient_specific_DE = FALSE
     }
     if (mode == "expression") {
-        if(verbose){message("EXPRESSION mode: predicting cell-type expression in bulks - requires single-cell coefficients fitted by CLIMB")}
+        if (verbose) {
+            message("EXPRESSION mode: predicting cell-type expression in bulks - requires single-cell coefficients fitted by CLIMB")
+        }
         predict_abundance = TRUE
         predict_expression = TRUE
         DE_analysis = FALSE
         patient_specific_DE = FALSE
     }
     if (mode == "DE.only") {
-        if(verbose){message("Running DE analysis based on existing CLIMB object")}
+        if (verbose) {
+            message("Running DE analysis based on existing CLIMB object")
+        }
         predict_abundance = FALSE
         predict_expression = FALSE
         DE_analysis = TRUE
@@ -77,7 +89,9 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
     sc$cellType = factor(sc$cellType)
     cellTypes = levels(sc$cellType)
     common_genes = intersect(rownames(bulk), rownames(sc))
-    if(verbose){message(paste0(length(common_genes), " common genes found between scRNA-seq refererence and bulk datasets"))}
+    if (verbose) {
+        message(paste0(length(common_genes), " common genes found between scRNA-seq refererence and bulk datasets"))
+    }
     if (length(common_genes) < min_common_genes) {
         stop("too few genes found between scRNA-seq refererence and bulk dataset")
     }
@@ -89,32 +103,16 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
     K = length(cellTypes)
     S_pred_mapping_n = array(rep(0, N * G * K), c(N, G, K))
     if (predict_abundance) {
-        if(verbose){message("Bulk to single-cell mapping for prediction of cell-type abundance / expression")}
+        if (verbose) {
+            message("Bulk to single-cell mapping for prediction of cell-type abundance / expression")
+        }
         for (i in 1:N) {
             y = num(exprs(bulk)[, i])
-            if (dwls_weights){
-                # CLIMB first pass
-                fit = glmnet(scmat, y, lower.limits = 0, upper.limits = up.lim, standardize=T)
-                coefs = coef(fit)[-1, dim(coef(fit))[2]]
-                # Implement DWLS-like weights using single-cell expression matrix
-                alpha_tilde_tm1 = coefs/(sum(coefs))
-                weights_tm1 = 1 / (scmat %*% num(alpha_tilde_tm1))^2
-                weights_tm1[weights_tm1 == Inf] <- max(weights_tm1[weights_tm1 != Inf])
-                q_weights_tm1 = quantile(weights_tm1, probs = seq(0,1,0.01))
-                weights_tm1[weights_tm1 > q_weights_tm1[95]] <- q_weights_tm1[95]
-                # Run second pass of CLIMB
-                fit = glmnet(scmat, y, standardize = T, lower.limits = 0.0, lambda=0.0, weights = weights_tm1)
-                coefs = coef(fit)[-1,dim(coef(fit))[2]]
-            } else {
-                # CLIMB one-pass original (no weights)
-                fit = glmnet(scmat, y, lower.limits = 0.0, lambda=0.0, upper.limits = up.lim, standardize=T)
-                coefs = coef(fit)[-1, dim(coef(fit))[2]]
-            }
-            if (norm_coefs) { 
-                agg = aggregate(coefs / cell_expr, list(sc$cellType), sum, drop = F)
-            } else {
-                agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
-            }
+            fit = glmnet(scmat, y, lower.limits = 0, lambda = 0, 
+              upper.limits = up.lim, standardize = T)
+            coefs = coef(fit)[-1, dim(coef(fit))[2]]
+            agg = aggregate(coefs, list(sc$cellType), sum, 
+              drop = F)
             agg$x[is.na(agg$x)] <- 0
             ppred = (agg$x)/sum(agg$x)
             names(ppred) = agg$Group.1
@@ -137,15 +135,142 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             }
             save_coefs[[i]] = coefs
         }
-        final_res$props = do.call(rbind, ct.props)
-        if(verbose){message("Cell-type abundance prediction done. ")}
+        final_res$props.init = do.call(rbind, ct.props)
+        if (verbose) {
+            message("First pass of cell-type abundance prediction done. Start second pass...")
+        }
+        # Make maximum sizes :
+        max_size = round(dim(sc)[2] / 2)
+        # sc normalization
+        sc_mat = exprs(sc)
+        median_counts = median(colSums(sc_mat))
+        sc_mat_norm = log(t(t(sc_mat) / colSums(sc_mat))*median_counts + 1)
+        K = length(unique(sc$cellType))
+        ratio_cell_increase=min(0.01*K, 0.1)
+        # bulk normalization
+        bulk_mat = exprs(bulk)
+        bulk_mat_norm = log(t(t(bulk_mat) / colSums(bulk_mat))*median_counts + 1)
+        N = dim(bulk_mat_norm)[2]
+        # gene intersection 
+        inter.genes = intersect(rownames(sc_mat_norm), rownames(bulk_mat_norm))
+        sc_mat_norm = sc_mat_norm[inter.genes,] ; sc = sc[inter.genes,]
+        bulk_mat_norm = bulk_mat_norm[inter.genes,] ; bulk = bulk[inter.genes,]
+        # compute average expression
+        sc_mat_avg = aggregate(t(sc_mat_norm), list(sc$cellType), mean)
+        celltypes = colnames(pData(bulk))
+        celltypes = reformat_celltypes(celltypes)
+        rownames(sc_mat_avg) = sc_mat_avg$`Group.1`
+        rownames(sc_mat_avg) = reformat_celltypes(rownames(sc_mat_avg))
+        sc_mat_avg = sc_mat_avg[,-1]
+        sc_mat_avg = sc_mat_avg[celltypes,]
+        sel.genes = colSds(as.matrix(sc_mat_avg)) != 0
+        sc_mat_avg = sc_mat_avg[,sel.genes]
+        bulk_mat_norm = bulk_mat_norm[sel.genes,]
+        sc_mat_norm = sc_mat_norm[sel.genes,]
+        bulk = bulk[sel.genes,]
+        sc = sc[sel.genes,]
+        all(rownames(sc_mat_avg) == celltypes)
+        fc_to_average = t(sc_mat_avg) / colMeans(sc_mat_avg)
+        fc_to_second_l = list()
+        for(c in 1:ncol(sc_mat_avg)){
+            col_c = sc_mat_avg[,c]
+            if (col_c[order(-col_c)][2] > 0){
+                fc_to_second_l[[c]] = col_c / col_c[order(-col_c)][2]
+            } else {
+                fc_to_second_l[[c]] = col_c*0.0000001
+            }
+        }
+        fc_to_second = do.call(rbind, fc_to_second_l)
+        double_condition_matrix = fc_to_average > num(quantile(flatten(fc_to_average), p=0.95)) & fc_to_second > num(quantile(flatten(fc_to_average), p=0.75))
+        double_condition_matrix = double_condition_matrix[rowSums(double_condition_matrix) > 0,]
+        celltype_counts = matrix(0, ncol=K, nrow=1)
+        list_genes = list()
+        r_=1
+        for(r in 1:nrow(double_condition_matrix)){
+            row_ = double_condition_matrix[r,]
+            if (celltype_counts[1,which.max(row_)] <= 100){
+                celltype_counts[1,which.max(row_)] = celltype_counts[1,which.max(row_)]+1
+                list_genes[[r_]] = rownames(double_condition_matrix)[r]
+                r_ = r_+1
+            }
+        }
+        top_var = unique(unlist(list_genes))
+        n_top_var = length(top_var)
+        # if not even variable genes, limit the number of top genes in bulks
+        if( (n_top_var/2) < n.top_mean.genes){
+            n.top_mean.genes = round(n_top_var/2)
+        }
+        sc_mat_norm_v = sc_mat_norm[top_var,]
+        bulk_mat_norm_v = bulk_mat_norm[top_var,]
+        sc_mat_avg_sub = sc_mat_avg[,top_var]
+        ct.props = list()
+        max_celltype_size = max(num(table(sc$cellType)))
+        if(max_celltype_size > max_size){ max_celltype_size <- max_size }
+        ref.counts = table(sc$cellType)
+        for(n in 1:N){
+            top_means = -1*sort(-bulk_mat_norm_v[, n]*apply(sc_mat_avg_sub, 2, max))
+            top_means = top_means[1:n.top_mean.genes]
+            gene_topExpr = rev(names(top_means))
+
+            sc_mat_norm_ = sc_mat_norm_v[gene_topExpr,]
+            bulk_mat_norm_ = bulk_mat_norm_v[gene_topExpr,]
+            y = num(bulk_mat_norm_[, n])
+            ref.props = table(sc$cellType) / sum(table(sc$cellType))
+            # Generate sampling number per cell-type
+            celltype_counts = data.frame(matrix(min.n.cells, nrow=1, ncol=K))
+            #cor_with_ref = cor(nnls(t(sc_mat_avg[,gene_topExpr]), as.vector(y))$x, ref.props)
+            cor_with_ref = cor(final_res$props.init[n,], ref.props)
+            bias_correction_factor = 1-(cor_with_ref+1)/2
+            colnames(celltype_counts) = celltypes
+            for(i in 1:length(gene_topExpr)){
+                gene = gene_topExpr[[i]]
+                ct = which.max(sc_mat_avg[,gene])
+                celltype_counts[,ct] = celltype_counts[,ct] + min(round(celltype_counts[,ct]*ratio_cell_increase),1)
+            }
+            celltype_counts=max_size*celltype_counts/sum(celltype_counts)
+            celltype_counts_ref = ref.props*sum(celltype_counts)*2
+            celltype_counts = bias_correction_factor*celltype_counts+(1-bias_correction_factor)*celltype_counts_ref
+            # Run deconvolution on 5 sub-sampled single-cell datasets
+            sum_props = matrix(0, nrow=1, ncol=K)
+            for(x in 1:n.iter.subsampling){
+                # Sub-sampling cells from single-cell dataset
+                set.seed(x)
+                all_samples = list()
+                for(k in 1:length(celltypes)){
+                    ct = celltypes[[k]]
+                    all_samples[[k]] = sample(grep(paste0('^',ct,'$'),sc$cellType), celltype_counts[,ct], replace = T)
+                }
+                sample_ = unlist(all_samples)
+                sc.es.sub = sc[gene_topExpr,sample_]
+                scmat = sc_mat_norm_[,sample_]
+                # Launch deconvolution
+                fit = glmnet(scmat, y, lower.limits = 0, upper.limits = 0.001, standardize = T) 
+                coefs = coef(fit)[-1, dim(coef(fit))[2]]
+
+                agg = aggregate(coefs, list(sc.es.sub$cellType), sum, 
+                                drop = F)
+                agg$x[is.na(agg$x)] <- 0
+                ppred = (agg$x)/sum(agg$x)
+                names(ppred) = agg$Group.1
+                sum_props = sum_props+ppred
+            }
+            pred_prop = sum_props / rowSums(sum_props)
+            ct.props[[n]] = pred_prop
+        }
+        final_res$props.corrected = do.call(rbind, ct.props)
+        if (verbose) {
+            message("Second pass is done. Cell-type abundance prediction is over.")
+        }
     }
     if (predict_expression) {
-        if(verbose){message("Starting high-resolution expression deconvolution")}
-        if ( cancer_pattern == 'none' ){
+        if (verbose) {
+            message("Starting high-resolution expression deconvolution")
+        }
+        if (cancer_pattern == "none") {
             for (g in 1:G) {
                 for (n in 1:N) {
-                    S_pred_mapping_n[n, g, ] = ct.exprs[[n]][,g]
+                  S_pred_mapping_n[n, g, ] = ct.exprs[[n]][, 
+                    g]
                 }
             }
             dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
@@ -153,9 +278,11 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             dimnames(S_pred_mapping_n)[[3]] = cellTypes
             final_res$expr.highres = S_pred_mapping_n
             final_res$expr.mapping = S_pred_mapping_n
-            final_res$expr.overall = colSums(S_pred_mapping_n, dims = 1) 
+            final_res$expr.overall = colSums(S_pred_mapping_n, 
+                dims = 1)
             final_res$coefs = save_coefs
-        } else {
+        }
+        else {
             normal_sel = !grepl(cancer_pattern, sc$cellType)
             cancer_sel = grepl(cancer_pattern, sc$cellType)
             cancer_ct_sel = grepl(cancer_pattern, cellTypes)
@@ -170,27 +297,29 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             for (g in 1:G) {
                 Epsilon_g = num(Epsilon_ng[, g])
                 if (sd(Epsilon_g) != 0) {
-                    fit = glmnet(alpha_cancer, Epsilon_g, intercept = TRUE)
-                    C_diff_cancer = num(coef(fit)[-1, dim(coef(fit))[2]])
-                    for (n in 1:N) {
-                      Epsilon_cancer_n = aggregate(C_diff_cancer * 
-                        alpha_cancer[n, ], list(sc.cancer$cellType), 
-                        sum)$x
-                      Epsilon_n = rep(0, K)
-                      Epsilon_n[cancer_ct_sel] = Epsilon_cancer_n
-                      S_pred_mapping_n[n, g, ] = ct.exprs[[n]][, 
-                        g]
-                      S_pred_n[n, g, ] = S_pred_mapping_n[n, g, ] + 
-                        Epsilon_n
-                      S_pred_n[n, g, ][S_pred_n[n, g, ] < 0] = 0
-                    }
+                  fit = glmnet(alpha_cancer, Epsilon_g, intercept = TRUE)
+                  C_diff_cancer = num(coef(fit)[-1, dim(coef(fit))[2]])
+                  for (n in 1:N) {
+                    Epsilon_cancer_n = aggregate(C_diff_cancer * 
+                      alpha_cancer[n, ], list(sc.cancer$cellType), 
+                      sum)$x
+                    Epsilon_n = rep(0, K)
+                    Epsilon_n[cancer_ct_sel] = Epsilon_cancer_n
+                    S_pred_mapping_n[n, g, ] = ct.exprs[[n]][, 
+                      g]
+                    S_pred_n[n, g, ] = S_pred_mapping_n[n, g, 
+                      ] + Epsilon_n
+                    S_pred_n[n, g, ][S_pred_n[n, g, ] < 0] = 0
+                  }
                 }
                 else {
-                    S_pred_n[n, g, ] = rep(0, K)
+                  S_pred_n[n, g, ] = rep(0, K)
                 }
                 if (g%%1000 == 0) {
-                    if(verbose){message(paste0("High-Resolution expression prediction: ", 
-                      g, " genes processed..."))}
+                  if (verbose) {
+                    message(paste0("High-Resolution expression prediction: ", 
+                      g, " genes processed..."))
+                  }
                 }
             }
             dimnames(S_pred_n)[[1]] = dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
@@ -198,145 +327,16 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", norm_c
             dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
             final_res$expr.highres = S_pred_n
             final_res$expr.mapping = S_pred_mapping_n
-            final_res$expr.overall = colSums(S_pred_mapping_n, dims = 1)
+            final_res$expr.overall = colSums(S_pred_mapping_n, 
+                dims = 1)
             final_res$coefs = save_coefs
         }
     }
     else {
         final_res$expr.highres = S_pred_mapping_n
         final_res$expr.mapping = S_pred_mapping_n
-        final_res$expr.overall = colSums(S_pred_mapping_n, dims = 1) 
+        final_res$expr.overall = colSums(S_pred_mapping_n, dims = 1)
         final_res$coefs = save_coefs
-    }
-    if (!all(is.na(conditions))) {
-        DE_analysis = TRUE
-    }
-    if (DE_analysis == TRUE) {
-        if(verbose){message("Starting DE analysis")}
-        define_signif <- function(p_) {
-            signif_p_ = p_
-            signif_p_[p_ < 0.05] = "*"
-            signif_p_[p_ < 0.01] = "**"
-            signif_p_[p_ < 0.001] = "***"
-            signif_p_[p_ < 1e-04] = "****"
-            signif_p_[p_ >= 0.05] = "n.s"
-            return(signif_p_)
-        }
-        S_mat = round(final_res$expr.pred)
-        ct_prop = final_res$props
-        tot_expr = num(colSums(exprs(bulk)))/1e+06
-        N = dim(S_mat)[1]
-        G = dim(S_mat)[2]
-        K = dim(S_mat)[3]
-        pvals = array(rep(1, G * K), c(G, K))
-        padjs = array(rep(1, G * K), c(G, K))
-        fcs = array(rep(0, G * K), c(G, K))
-        pvals.N = array(rep(1, N * G * K), c(N, G, K))
-        padjs.N = array(rep(1, N * G * K), c(N, G, K))
-        fcs.N = array(rep(1, N * G * K), c(N, G, K))
-        ct.pvals = array(rep(1, K), c(K))
-        ct.padjs = array(rep(1, K), c(G, K))
-        ct.fcs = array(rep(0, K), c(K))
-        if (!all(is.na(conditions))) {
-            if(verbose){message(paste0("DE analysis of cell-type proportions"))}
-            colData = data.frame(condition = conditions, tot_expr = tot_expr)
-            w_k_per1000cells = round(t(1000 * ct_prop)) + 1
-            dds.ct <- DESeqDataSetFromMatrix(countData = w_k_per1000cells, 
-                colData = colData, design = (~tot_expr + condition))
-            dds.ct <- tryCatch(expr = {
-                DESeq(dds.ct)
-            }, error = function(cond) {
-                if(verbose){message("Error with DE analysis, using fit with mean instead")}
-                return(DESeq(dds.ct, fitType = "mean"))
-            })
-            df_res.ct = results(dds.ct)[order(results(dds.ct)$pvalue, 
-                decreasing = F), ]
-        }
-        for (k in 1:K) {
-            if(verbose){message(paste0("DE analysis of cell-type ", dimnames(S_mat)[[3]][k]))}
-            if (!all(is.na(conditions))) {
-                if(verbose){message(paste0("DE analysis between two conditions: ",
-                  unique(conditions)[1], " vs ", unique(conditions)[2]))}
-                S_k = S_mat[, , k]
-                w_k = ct_prop[, k]
-                if (rankMatrix(S_k)[1] == 0) {
-                  if(verbose){message("matrix not full ranked, skipping cell-type")}
-                  next
-                }
-                colData = data.frame(condition = conditions, 
-                  celltype_prop = w_k, tot_expr = tot_expr)
-                dds <- DESeqDataSetFromMatrix(countData = t(S_k) + 
-                  1, colData = colData, design = (~tot_expr + 
-                  celltype_prop + condition))
-                dds <- tryCatch(expr = {
-                  DESeq(dds)
-                }, error = function(cond) {
-                  if(verbose){message("Error with DE analysis, using fit with mean instead")}
-                  return(DESeq(dds, fitType = "mean"))
-                })
-                fcs[, k] = num(-1 * results(dds, tidy = TRUE)$log2FoldChange)
-                pvals[, k] = num(results(dds, tidy = TRUE)$pvalue)
-                padjs[, k] = num(results(dds, tidy = TRUE)$padj)
-            }
-            if (patient_specific_DE) {
-                if(verbose){message("DE analysis per sample")}
-                for (n in 1:N) {
-                  cond_temp = conditions
-                  cond_temp[n] <- "condition_n"
-                  sel.n = cond_temp != "condition"
-                  conditions.n = cond_temp[sel.n]
-                  S_k.n = S_k[sel.n, ]
-                  w_k.n = w_k[sel.n]
-                  if (rankMatrix(S_k.n)[1] == 0) {
-                    if(verbose){message("matrix not full ranked, skipping cell-type")}
-                    next
-                  }
-                  tot_expr.n = num(total_expr/1e+06)[sel.n]
-                  colData = data.frame(condition = conditions.n, 
-                    celltype_prop = w_k.n, tot_expr = tot_expr.n)
-                  dds <- DESeqDataSetFromMatrix(countData = t(S_k.n) + 
-                    1, colData = colData, design = (~tot_expr + 
-                    celltype_prop + condition))
-                  dds <- DESeq(dds)
-                  dds <- tryCatch(expr = {
-                    DESeq(dds)
-                  }, error = function(cond) {
-                    if(verbose){message("Error with DE analysis, using fit with mean instead")}
-                    return(DESeq(dds, fitType = "mean"))
-                  })
-                  fcs.N[n, , k] = num(-1 * results(dds, tidy = TRUE)$log2FoldChange)
-                  pvals.N[n, , k] = num(results(dds, tidy = TRUE)$pvalue)
-                  padjs.N[n, , k] = num(results(dds, tidy = TRUE)$padj)
-                }
-            }
-        }
-        log_pvals = array(-log10(pvals), c(G, K))
-        log_padj = array(-log10(padjs), c(G, K))
-        signif_pred = define_signif(padjs)
-        dimnames(pvals) = dimnames(log_pvals) = dimnames(padjs) = dimnames(log_padj) = dimnames(signif_pred) = dimnames(fcs) = dimnames(S_mat[1, 
-            , ])
-        df_res = cbind(melt(pvals), melt(log_pvals)[, 3], melt(padjs)[, 
-            3], melt(log_padj)[, 3], melt(fcs)[, 3], melt(signif_pred)[, 
-            3])
-        colnames(df_res) = c("gene", "celltype", "pval", "log10_pval", 
-            "padj", "log10_padj", "log2_FC", "signif")
-        df_res = df_res[order(df_res$log10_pval, decreasing = T), 
-            ]
-        log_pvals.N = array(-log10(pvals.N), c(N, G, K))
-        log_padj.N = array(-log10(padjs.N), c(N, G, K))
-        signif_pred.N = define_signif(padjs.N)
-        dimnames(pvals.N) = dimnames(log_pvals.N) = dimnames(padjs.N) = dimnames(log_padj.N) = dimnames(signif_pred.N) = dimnames(fcs.N) = dimnames(S_mat)
-        df_res.N = cbind(melt(pvals.N), melt(log_pvals.N)[, 4], 
-            melt(padjs.N)[, 4], melt(log_padj.N)[, 4], melt(fcs.N)[, 
-                4], melt(signif_pred.N)[, 4])
-        colnames(df_res.N) = c("sample", "gene", "celltype", 
-            "pval", "log10_pval", "padj", "log10_padj", "log2_FC", 
-            "signif")
-        df_res.N = df_res.N[order(df_res.N$log10_pval, decreasing = T), 
-            ]
-        final_res$DE.expr.conditions = df_res
-        final_res$DE.props.conditions = df_res.ct
-        final_res$DE.expr.persample
     }
     return(final_res)
 } 
