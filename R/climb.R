@@ -136,6 +136,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
             }
             save_coefs[[i]] = coefs
         }
+        rownames(ct.props)=colnames(bulk)
         final_res$props.init = do.call(rbind, ct.props)
         if (verbose) {
             message("First pass of cell-type abundance prediction done. Start second pass...")
@@ -212,7 +213,6 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
             top_means = -1*sort(-bulk_mat_norm_v[, n]*apply(sc_mat_avg_sub, 2, max))
             top_means = top_means[1:n.top_mean.genes]
             gene_topExpr = rev(names(top_means))
-
             sc_mat_norm_ = sc_mat_norm_v[gene_topExpr,]
             bulk_mat_norm_ = bulk_mat_norm_v[gene_topExpr,]
             y = num(bulk_mat_norm_[, n])
@@ -258,6 +258,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
             pred_prop = sum_props / rowSums(sum_props)
             ct.props[[n]] = pred_prop
         }
+        rownames(ct.props)=colnames(bulk)
         final_res$props.corrected = do.call(rbind, ct.props)
         if (verbose) {
             message("Second pass is done. Cell-type abundance prediction is over.")
