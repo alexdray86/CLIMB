@@ -23,7 +23,7 @@
 #' @param min.n.cells minimum number of cells per cell type to subsample. If a cell type has less cells in reference, then sampling is done with replacement.
 #' @export
 climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", 
-    up.lim = Inf, lambda = 0, norm_factor = 0.1, verbose = TRUE, 
+    up.lim = 0.001, lambda = 0, norm_factor = 0.1, verbose = TRUE, 
     conditions = NA, predict_abundance = TRUE, predict_expression = TRUE, 
     min_common_genes = 100, n.top_var.genes=3000, n.top_mean.genes=1000, 
     ratio_cell_increase=0.02, n.iter.subsampling=5, min.n.cells=75) 
@@ -110,7 +110,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
         for (i in 1:N) {
             y = num(exprs(bulk)[, i])
             fit = glmnet(scmat, y, lower.limits = 0, lambda = 0, 
-              upper.limits = up.lim, standardize = T)
+                         standardize = T)
             coefs = coef(fit)[-1, dim(coef(fit))[2]]
             agg = aggregate(coefs, list(sc$cellType), sum, 
               drop = F)
