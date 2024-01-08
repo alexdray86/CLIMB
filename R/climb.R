@@ -5,28 +5,20 @@
 #'
 #' @param sc ExpressionSet object containing the scRNA-seq reference dataset
 #' @param bulk ExpressionSet object containing the mixtures to be deconvoluted
-#' @param ratio_cancer_cells numeric vector, same size as number of mixtures. if we have data about the fraction of cancer cells present in mixture, this can improve deconvolution accuracy. If ratio_cancer_cells is provided, then CLIMB-BA method will be used. It is important that cancer cell-types in the scRNA-seq dataset contains the pattern "-like" to be recognized as cancer cells.
-#' @param norm_coefs boolean indicating whether coefficients should be normalized by total RNA content
-#' @param dwls_weights boolean indicating whether a 2-pass procedure should be applied, with DWLS-like gene-specific weights applied on the 2nd pass.
 #' @param verbose boolean indicating whether to print message during running
 #' @param up.lim numeric scalar, impose a l-infinity norm to the linear model (upper bound for coefficient)
 #' @param lambda Regularization factor
-#' @param norm_factor if ratio_cancer_cells is provided, indicate strength of smooth normalization
 #' @param cancer_pattern a string pattern present in all cancer cell-type. Only for these cell-types CLIMB will assume the presence of differentially expressed genes
 #' @param mode indicate which mode to use between: ['all'] run bulk deconvolution of cell-type proportions - cell-type expression - and differential expression analysis (without per sample DE analysis). ['all+'] same as 'all' but adds per-sample DE analysis (takes long time to run). ['abundance'] only performs cell-type proportions inference. ['expression'] performs cell-type proportions together with cell-type expression prediction.
-#' @param predict_abundance boolean indicating whether cell-type proportions should be assessed. This needs to be true for cell-type expression prediction to run.
-#' @param predict_expression boolean indicating whether cell-type expression should be predicted (takes longer to run)
 #' @param min_common_genes minimum number of genes to be in common between bulk and scRNA-seq datsets 
-#' @param n.top_var.genes number of variable genes to consider for the embirical bayes sampling of cells in reference 
 #' @param ratio_cell_increase percentage increase at each step of the embirical bayes procedure
 #' @param n.iter.subsampling number of subsampling that will be performed on the single-cell reference (results from each subsample are then averaged) 
 #' @param min.n.cells minimum number of cells per cell type to subsample. If a cell type has less cells in reference, then sampling is done with replacement.
 #' @export
-climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance", 
-    up.lim = 0.001, lambda = 0, norm_factor = 0.1, verbose = TRUE, 
-    conditions = NA, predict_abundance = TRUE, predict_expression = TRUE, 
-    min_common_genes = 100, n.top_var.genes=3000, n.top_mean.genes=1000, 
-    ratio_cell_increase=0.02, n.iter.subsampling=5, min.n.cells=75) 
+climb <- function (sc, bulk, mode = "abundance", 
+    up.lim = Inf, lambda = 0, verbose = TRUE, cancer_pattern = "*",
+    conditions = NA, final_res = list(), min_common_genes = 100, ratio_cell_increase=0.02, 
+    n.iter.subsampling=5, min.n.cells ) 
 {
     if (mode == "all") {
         if (verbose) {
@@ -83,7 +75,6 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
     }
     ct.props = list()
     ct.exprs = list()
-    final_res = list()
     sc.mat = exprs(sc)
     cell_expr = colSums(exprs(sc))
     save_coefs = list()
@@ -110,7 +101,7 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
         for (i in 1:N) {
             y = num(exprs(bulk)[, i])
             fit = glmnet(scmat, y, lower.limits = 0, lambda = 0, 
-                         standardize = T)
+              upper.limits = up.lim, standardize = T)
             coefs = coef(fit)[-1, dim(coef(fit))[2]]
             agg = aggregate(coefs, list(sc$cellType), sum, 
               drop = F)
@@ -136,9 +127,9 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
             }
             save_coefs[[i]] = coefs
         }
-        climb_props.init = do.call(rbind, ct.props)
-        rownames(climb_props.init)=colnames(bulk)
-        colnames(climb_props.init)=levels(sc$cellType)
+        climb_props.init = data.frame(do.call(rbind, ct.props))
+        rownames(climb_props.init) = colnames(bulk)
+        colnames(climb_props.init) = levels(sc$cellType)
         final_res$props.init = climb_props.init
         if (verbose) {
             message("First pass of cell-type abundance prediction done. Start second pass...")
@@ -161,10 +152,10 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
         bulk_mat_norm = bulk_mat_norm[inter.genes,] ; bulk = bulk[inter.genes,]
         # compute average expression
         sc_mat_avg = aggregate(t(sc_mat_norm), list(sc$cellType), mean)
-        celltypes = colnames(pData(bulk))
-        celltypes = reformat_celltypes(celltypes)
+        celltypes = colnames(levels(sc$cellType))
+        #celltypes = reformat_celltypes(celltypes)
         rownames(sc_mat_avg) = sc_mat_avg$`Group.1`
-        rownames(sc_mat_avg) = reformat_celltypes(rownames(sc_mat_avg))
+        #rownames(sc_mat_avg) = reformat_celltypes(rownames(sc_mat_avg))
         sc_mat_avg = sc_mat_avg[,-1]
         sc_mat_avg = sc_mat_avg[celltypes,]
         sel.genes = colSds(as.matrix(sc_mat_avg)) != 0
@@ -207,63 +198,65 @@ climb <- function (sc, bulk, cancer_pattern = "none", mode = "abundance",
         sc_mat_norm_v = sc_mat_norm[top_var,]
         bulk_mat_norm_v = bulk_mat_norm[top_var,]
         sc_mat_avg_sub = sc_mat_avg[,top_var]
-        ct.props = list()
         max_celltype_size = max(num(table(sc$cellType)))
         if(max_celltype_size > max_size){ max_celltype_size <- max_size }
+        min.n.cells = min(min.n.cells, round(0.02*max_size))
         ref.counts = table(sc$cellType)
-        for(n in 1:N){
-            top_means = -1*sort(-bulk_mat_norm_v[, n]*apply(sc_mat_avg_sub, 2, max))
-            top_means = top_means[1:n.top_mean.genes]
-            gene_topExpr = rev(names(top_means))
-            sc_mat_norm_ = sc_mat_norm_v[gene_topExpr,]
-            bulk_mat_norm_ = bulk_mat_norm_v[gene_topExpr,]
-            y = num(bulk_mat_norm_[, n])
-            ref.props = table(sc$cellType) / sum(table(sc$cellType))
-            # Generate sampling number per cell-type
-            celltype_counts = data.frame(matrix(min.n.cells, nrow=1, ncol=K))
-            #cor_with_ref = cor(nnls(t(sc_mat_avg[,gene_topExpr]), as.vector(y))$x, ref.props)
-            cor_with_ref = cor(final_res$props.init[n,], ref.props)
-            bias_correction_factor = 1-(cor_with_ref+1)/2
-            colnames(celltype_counts) = celltypes
-            for(i in 1:length(gene_topExpr)){
-                gene = gene_topExpr[[i]]
-                ct = which.max(sc_mat_avg[,gene])
-                celltype_counts[,ct] = celltype_counts[,ct] + min(round(celltype_counts[,ct]*ratio_cell_increase),1)
-            }
-            celltype_counts=max_size*celltype_counts/sum(celltype_counts)
-            celltype_counts_ref = ref.props*sum(celltype_counts)*2
-            celltype_counts = bias_correction_factor*celltype_counts+(1-bias_correction_factor)*celltype_counts_ref
-            # Run deconvolution on 5 sub-sampled single-cell datasets
-            sum_props = matrix(0, nrow=1, ncol=K)
-            for(x in 1:n.iter.subsampling){
-                # Sub-sampling cells from single-cell dataset
-                set.seed(x)
-                all_samples = list()
-                for(k in 1:length(celltypes)){
-                    ct = celltypes[[k]]
-                    all_samples[[k]] = sample(grep(paste0('^',ct,'$'),sc$cellType), celltype_counts[,ct], replace = T)
-                }
-                sample_ = unlist(all_samples)
-                sc.es.sub = sc[gene_topExpr,sample_]
-                scmat = sc_mat_norm_[,sample_]
-                # Launch deconvolution
-                fit = glmnet(scmat, y, lower.limits = 0, upper.limits = 0.001, standardize = T) 
-                coefs = coef(fit)[-1, dim(coef(fit))[2]]
+        prior_proportions = final_res$props.init
+        for(q in 1:2){
+            ct.props = list()
+            for(n in 1:N){
+                top_means = -1*sort(-bulk_mat_norm_v[, n]*apply(sc_mat_avg_sub, 2, max))
+                top_means = top_means[1:n.top_mean.genes]
+                gene_topExpr = rev(names(top_means))
 
-                agg = aggregate(coefs, list(sc.es.sub$cellType), sum, 
-                                drop = F)
-                agg$x[is.na(agg$x)] <- 0
-                ppred = (agg$x)/sum(agg$x)
-                names(ppred) = agg$Group.1
-                sum_props = sum_props+ppred
+                sc_mat_norm_ = sc_mat_norm_v[gene_topExpr,]
+                bulk_mat_norm_ = bulk_mat_norm_v[gene_topExpr,]
+                y = num(bulk_mat_norm_[, n])
+                
+                celltype_counts = matrix(prior_proportions[n,]*(max_size), nrow=1, ncol=K)
+                colnames(celltype_counts) = colnames(prior_proportions)
+                celltype_counts[celltype_counts < min.n.cells] <- min.n.cells 
+                # Run deconvolution on 5 sub-sampled single-cell datasets
+                sum_props = matrix(0, nrow=1, ncol=K)
+                for(x in 1:n.iter.subsampling){
+                    # Sub-sampling cells from single-cell dataset
+                    all_samples = list()
+                    for(k in 1:length(celltypes)){
+                        ct = celltypes[k]
+                        set.seed(x*k)
+                        all_samples[[k]] = sample(grep(paste0('^',ct,'$'),sc$cellType), round(num(celltype_counts[,ct])), replace = T)
+                    }
+                    sample_ = unlist(all_samples)
+                    sc.sub = sc[gene_topExpr,sample_]
+                    scmat = sc_mat_norm_[,sample_]
+                    # Launch deconvolution
+                    fit = glmnet(scmat, y, lower.limits = 0, upper.limits = 0.001) 
+                    coefs = coef(fit)[-1, dim(coef(fit))[2]]
+
+                    agg = aggregate(coefs, list(sc.sub$cellType), sum, 
+                                    drop = F)
+                    agg$x[is.na(agg$x)] <- 0
+                    ppred = (agg$x)/sum(agg$x)
+                    names(ppred) = agg$Group.1
+                    sum_props = sum_props+ppred
+                }
+                pred_prop = sum_props / rowSums(sum_props)
+                ct.props[[n]] = pred_prop
             }
-            pred_prop = sum_props / rowSums(sum_props)
-            ct.props[[n]] = pred_prop
+            climb_props.corrected = data.frame(do.call(rbind, ct.props))
+            rownames(climb_props.corrected) = colnames(bulk)
+            colnames(climb_props.corrected) = levels(sc$cellType)
+            prior_proportions = climb_props.corrected
         }
-        climb_props.corrected = do.call(rbind, ct.props)
-        rownames(climb_props.corrected)=colnames(bulk)
-        colnames(climb_props.corrected)=levels(sc$cellType)
-        final_res$props.corrected = climb_props.corrected
+        final_res$props.corrected = data.frame(climb_props.corrected)
+        minmax <- function(x, na.rm = TRUE) { return((x- min(x)) /(max(x)-min(x))) }
+        weights_ = minmax(num(cor(table(sc$cellType), t(final_res$props.init))))
+        final_res$props.final = as.matrix(final_res$props.init) * num(weights_) + as.matrix(final_res$props.corrected) * (1 - num(weights_))
+        rownames(final_res$props.corrected) = colnames(bulk)
+        colnames(final_res$props.corrected) = levels(sc$cellType)
+        rownames(final_res$props.final) = colnames(bulk)
+        colnames(final_res$props.final) = levels(sc$cellType)
         if (verbose) {
             message("Second pass is done. Cell-type abundance prediction is over.")
         }
