@@ -168,7 +168,7 @@ climb <- function (sc, bulk, mode = "abundance",
         bulk_mat_norm = bulk_mat_norm[inter.genes,] ; bulk = bulk[inter.genes,]
         # compute average expression
         sc_mat_avg = aggregate(t(sc_mat_norm), list(sc$cellType), mean)
-        celltypes = colnames(levels(sc$cellType))
+        celltypes = levels(sc$cellType)
         celltypes = reformat_celltypes(celltypes)
         rownames(sc_mat_avg) = sc_mat_avg$`Group.1`
         rownames(sc_mat_avg) = reformat_celltypes(rownames(sc_mat_avg))
