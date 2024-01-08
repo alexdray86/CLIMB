@@ -15,6 +15,22 @@
 #' @param n.iter.subsampling number of subsampling that will be performed on the single-cell reference (results from each subsample are then averaged) 
 #' @param min.n.cells minimum number of cells per cell type to subsample. If a cell type has less cells in reference, then sampling is done with replacement.
 #' @export
+reformat_strings2 <- function(vector_string){
+    # replace plus and minus (e.g. useful for CD34+, CD34- populations)
+    vector_string <- gsub('\\-$', '', vector_string) 
+    vector_string <- gsub('\\+', '', vector_string) 
+    vector_string <- gsub('minus', '', vector_string) 
+    vector_string <- gsub('plus', '', vector_string)
+    vector_string <- gsub('\\ ', '\\.', vector_string) 
+    # remove all special characters
+    vector_string <- gsub('[^[:alnum:] ]','',vector_string)
+    return(vector_string)
+}
+reformat_celltypes <- function(celltype_labels){
+    celltype_labels <- reformat_strings2(as.vector(celltype_labels))
+    celltype_labels <- factor(celltype_labels)
+    return(celltype_labels)
+}
 climb <- function (sc, bulk, mode = "abundance", 
     up.lim = Inf, lambda = 0, verbose = TRUE, cancer_pattern = "*",
     conditions = NA, final_res = list(), min_common_genes = 100, ratio_cell_increase=0.02, 
@@ -153,9 +169,9 @@ climb <- function (sc, bulk, mode = "abundance",
         # compute average expression
         sc_mat_avg = aggregate(t(sc_mat_norm), list(sc$cellType), mean)
         celltypes = colnames(levels(sc$cellType))
-        #celltypes = reformat_celltypes(celltypes)
+        celltypes = reformat_celltypes(celltypes)
         rownames(sc_mat_avg) = sc_mat_avg$`Group.1`
-        #rownames(sc_mat_avg) = reformat_celltypes(rownames(sc_mat_avg))
+        rownames(sc_mat_avg) = reformat_celltypes(rownames(sc_mat_avg))
         sc_mat_avg = sc_mat_avg[,-1]
         sc_mat_avg = sc_mat_avg[celltypes,]
         sel.genes = colSds(as.matrix(sc_mat_avg)) != 0
