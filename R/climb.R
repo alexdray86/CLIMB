@@ -168,15 +168,12 @@ climb <- function (sc, bulk, mode = "abundance",
         bulk_mat_norm = bulk_mat_norm[inter.genes,] ; bulk = bulk[inter.genes,]
         # compute average expression
         sc_mat_avg = aggregate(t(sc_mat_norm), list(sc$cellType), mean)
-        print(sc_mat_avg[,0:10])
         celltypes = levels(sc$cellType)
         celltypes = reformat_celltypes(celltypes)
-        print(celltypes)
         rownames(sc_mat_avg) = sc_mat_avg$`Group.1`
         rownames(sc_mat_avg) = reformat_celltypes(rownames(sc_mat_avg))
         sc_mat_avg = sc_mat_avg[,-1]
         sc_mat_avg = sc_mat_avg[celltypes,]
-        print(sc_mat_avg[,0:10])
         sel.genes = colSds(as.matrix(sc_mat_avg)) != 0
         sc_mat_avg = sc_mat_avg[,sel.genes]
         bulk_mat_norm = bulk_mat_norm[sel.genes,]
