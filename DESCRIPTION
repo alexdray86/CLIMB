@@ -1,6 +1,6 @@
 Package: climb
 Title: CLIMB: bulk deconvolution into cell-type abundance and cell-type expression from direct single-cell mapping to bulk
-Version: 1.0.1
+Version: 1.0.2
 Authors@R: 
     person("Alexandre", "Coudray", , "alexandre.coudray@epfl.ch", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-4584-4410"))

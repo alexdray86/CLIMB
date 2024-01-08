@@ -15,22 +15,7 @@
 #' @param n.iter.subsampling number of subsampling that will be performed on the single-cell reference (results from each subsample are then averaged) 
 #' @param min.n.cells minimum number of cells per cell type to subsample. If a cell type has less cells in reference, then sampling is done with replacement.
 #' @export
-reformat_strings2 <- function(vector_string){
-    # replace plus and minus (e.g. useful for CD34+, CD34- populations)
-    vector_string <- gsub('\\-$', '', vector_string) 
-    vector_string <- gsub('\\+', '', vector_string) 
-    vector_string <- gsub('minus', '', vector_string) 
-    vector_string <- gsub('plus', '', vector_string)
-    vector_string <- gsub('\\ ', '\\.', vector_string) 
-    # remove all special characters
-    vector_string <- gsub('[^[:alnum:] ]','',vector_string)
-    return(vector_string)
-}
-reformat_celltypes <- function(celltype_labels){
-    celltype_labels <- reformat_strings2(as.vector(celltype_labels))
-    celltype_labels <- factor(celltype_labels)
-    return(celltype_labels)
-}
+
 climb <- function (sc, bulk, mode = "abundance", 
     up.lim = Inf, lambda = 0, verbose = TRUE, cancer_pattern = "*",
     conditions = NA, final_res = list(), min_common_genes = 100, ratio_cell_increase=0.02, 
@@ -88,6 +73,17 @@ climb <- function (sc, bulk, mode = "abundance",
     }
     num <- function(x) {
         return(as.numeric(as.character(x)))
+    }
+    reformat_strings2 <- function(vector_string){
+        # replace plus and minus (e.g. useful for CD34+, CD34- populations)
+        vector_string <- gsub('\\-$', '', vector_string) ; vector_string <- gsub('\\+', '', vector_string)
+        vector_string <- gsub('minus', '', vector_string) ;        vector_string <- gsub('plus', '', vector_string)
+        vector_string <- gsub('\\ ', '\\.', vector_string) ; vector_string <- gsub('[^[:alnum:] ]','',vector_string)
+        return(vector_string)
+    }
+    reformat_celltypes <- function(celltype_labels){
+        celltype_labels <- reformat_strings2(as.vector(celltype_labels)) ;   celltype_labels <- factor(celltype_labels)
+        return(celltype_labels)
     }
     ct.props = list()
     ct.exprs = list()
