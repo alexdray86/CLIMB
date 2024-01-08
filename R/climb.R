@@ -34,7 +34,7 @@ reformat_celltypes <- function(celltype_labels){
 climb <- function (sc, bulk, mode = "abundance", 
     up.lim = Inf, lambda = 0, verbose = TRUE, cancer_pattern = "*",
     conditions = NA, final_res = list(), min_common_genes = 100, ratio_cell_increase=0.02, 
-    n.iter.subsampling=5, min.n.cells ) 
+    n.iter.subsampling=5, min.n.cells=50, n.top_mean.genes=500 ) 
 {
     if (mode == "all") {
         if (verbose) {
