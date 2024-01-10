@@ -101,7 +101,6 @@ climb <- function (sc, bulk, mode = "abundance",
     }
     sc = sc[common_genes, ]
     scmat = exprs(sc)
-    gamma_ = colSums(scmat)
     bulk = bulk[common_genes, ]
     N = dim(bulk)[2]
     G = dim(bulk)[1]
@@ -116,7 +115,6 @@ climb <- function (sc, bulk, mode = "abundance",
             fit = glmnet(scmat, y, lower.limits = 0, lambda = 0, 
               upper.limits = up.lim, standardize = T)
             coefs = coef(fit)[-1, dim(coef(fit))[2]]
-            coefs = coefs / gamma_ # coefficient norm. by cell sizes
             agg = aggregate(coefs, list(sc$cellType), sum, 
               drop = F)
             agg$x[is.na(agg$x)] <- 0
