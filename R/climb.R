@@ -171,7 +171,7 @@ climb <- function (sc, bulk, mode = "abundance",
         rownames(sc_mat_avg) = sc_mat_avg$`Group.1`
         rownames(sc_mat_avg) = reformat_celltypes(rownames(sc_mat_avg))
         sc_mat_avg = sc_mat_avg[,-1]
-        sc_mat_avg = sc_mat_avg[celltypes,]
+        sc_mat_avg = sc_mat_avg[as.character(celltypes),]
         sel.genes = apply(as.matrix(sc_mat_avg), 2, sd) != 0
         sc_mat_avg = sc_mat_avg[,sel.genes]
         bulk_mat_norm = bulk_mat_norm[sel.genes,]
