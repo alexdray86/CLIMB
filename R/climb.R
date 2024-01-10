@@ -265,7 +265,7 @@ climb <- function (sc, bulk, mode = "abundance",
         }
         final_res$props.corrected = data.frame(climb_props.corrected)
         minmax <- function(x, na.rm = TRUE) { return((x- min(x)) /(max(x)-min(x))) }
-        weights_ = minmax(num(cor(table(sc$cellType), t(final_res$props.init))))
+        weights_ = minmax(num(cor(table(sc$cellType), t(final_res$props.init))))^2
         final_res$props.final = as.matrix(final_res$props.init) * num(weights_) + as.matrix(final_res$props.corrected) * (1 - num(weights_))
         rownames(final_res$props.corrected) = colnames(bulk)
         colnames(final_res$props.corrected) = levels(sc$cellType)
