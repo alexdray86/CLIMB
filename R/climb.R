@@ -235,7 +235,7 @@ climb <- function (sc, bulk, mode = "abundance",
                     # Sub-sampling cells from single-cell dataset
                     all_samples = list()
                     for(k in 1:length(celltypes)){
-                        ct = celltypes[k]
+                        ct = as.character(celltypes[k])
                         set.seed(x*k)
                         all_samples[[k]] = sample(grep(paste0('^',ct,'$'),sc$cellType), round(num(celltype_counts[,ct])), replace = T)
                     }
