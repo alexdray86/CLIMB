@@ -262,14 +262,11 @@ climb <- function (sc, bulk, mode = "abundance",
             prior_proportions = climb_props.corrected
         }
         final_res$props.corrected = data.frame(climb_props.corrected)
-        minmax <- function(x, na.rm = TRUE) { return((x- min(x)) /(max(x)-min(x))) }
         weights_ = num(cor(table(sc$cellType), t(final_res$props.init)))
         weights_[weights_ < 0] <- 0
-        final_res$props.final = as.matrix(final_res$props.init) * num(weights_) + as.matrix(final_res$props.corrected) * (1 - num(weights_))
+        final_res$props.corrected = as.matrix(final_res$props.init) * num(weights_) + as.matrix(final_res$props.corrected) * (1 - num(weights_))
         rownames(final_res$props.corrected) = colnames(bulk)
         colnames(final_res$props.corrected) = levels(sc$cellType)
-        rownames(final_res$props.final) = colnames(bulk)
-        colnames(final_res$props.final) = levels(sc$cellType)
         if (verbose) {
             message("Second pass is done. Cell-type abundance prediction is over.")
         }
