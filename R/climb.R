@@ -14,12 +14,13 @@
 #' @param ratio_cell_increase percentage increase at each step of the embirical bayes procedure
 #' @param n.iter.subsampling number of subsampling that will be performed on the single-cell reference (results from each subsample are then averaged) 
 #' @param min.n.cells minimum number of cells per cell type to subsample. If a cell type has less cells in reference, then sampling is done with replacement.
+#' @param n.top_mean.genes number of genes used for bulk-specific gene selection.
 #' @export
 
-climb <- function (sc, bulk, mode = "abundance", 
-    up.lim = Inf, lambda = 0, verbose = TRUE, cancer_pattern = "*",
-    conditions = NA, final_res = list(), min_common_genes = 100, ratio_cell_increase=0.02, 
-    n.iter.subsampling=5, min.n.cells=50, n.top_mean.genes=500 ) 
+climb <- function (sc, bulk, mode = "abundance", up.lim = Inf, lambda = 0, 
+    verbose = TRUE, cancer_pattern = "*", conditions = NA, final_res = list(), 
+    min_common_genes = 100, ratio_cell_increase = 0.02, n.iter.subsampling = 5, 
+    min.n.cells = 50, n.top_mean.genes = 500) 
 {
     if (mode == "all") {
         if (verbose) {
@@ -74,15 +75,18 @@ climb <- function (sc, bulk, mode = "abundance",
     num <- function(x) {
         return(as.numeric(as.character(x)))
     }
-    reformat_strings2 <- function(vector_string){
-        # replace plus and minus (e.g. useful for CD34+, CD34- populations)
-        vector_string <- gsub('\\-$', '', vector_string) ; vector_string <- gsub('\\+', '', vector_string)
-        vector_string <- gsub('minus', '', vector_string) ;        vector_string <- gsub('plus', '', vector_string)
-        vector_string <- gsub('\\ ', '\\.', vector_string) ; vector_string <- gsub('[^[:alnum:] ]','',vector_string)
+    reformat_strings2 <- function(vector_string) {
+        vector_string <- gsub("\\-$", "", vector_string)
+        vector_string <- gsub("\\+", "", vector_string)
+        vector_string <- gsub("minus", "", vector_string)
+        vector_string <- gsub("plus", "", vector_string)
+        vector_string <- gsub("\\ ", "\\.", vector_string)
+        vector_string <- gsub("[^[:alnum:] ]", "", vector_string)
         return(vector_string)
     }
-    reformat_celltypes <- function(celltype_labels){
-        celltype_labels <- reformat_strings2(as.vector(celltype_labels)) ;   celltype_labels <- factor(celltype_labels)
+    reformat_celltypes <- function(celltype_labels) {
+        celltype_labels <- reformat_strings2(as.vector(celltype_labels))
+        celltype_labels <- factor(celltype_labels)
         return(celltype_labels)
     }
     ct.props = list()
@@ -113,10 +117,9 @@ climb <- function (sc, bulk, mode = "abundance",
         for (i in 1:N) {
             y = num(exprs(bulk)[, i])
             fit = glmnet(scmat, y, lower.limits = 0, lambda = 0, 
-              upper.limits = up.lim, standardize = T)
+                upper.limits = up.lim, standardize = T)
             coefs = coef(fit)[-1, dim(coef(fit))[2]]
-            agg = aggregate(coefs, list(sc$cellType), sum, 
-              drop = F)
+            agg = aggregate(coefs, list(sc$cellType), sum, drop = F)
             agg$x[is.na(agg$x)] <- 0
             ppred = (agg$x)/sum(agg$x)
             names(ppred) = agg$Group.1
@@ -146,117 +149,123 @@ climb <- function (sc, bulk, mode = "abundance",
         if (verbose) {
             message("First pass of cell-type abundance prediction done. Start second pass...")
         }
-        # Make maximum sizes :
-        max_size = round(dim(sc)[2] / 2)
-        # sc normalization
+        max_size = round(dim(sc)[2]/2)
         sc_mat = exprs(sc)
         median_counts = median(colSums(sc_mat))
-        sc_mat_norm = log(t(t(sc_mat) / colSums(sc_mat))*median_counts + 1)
+        sc_mat_norm = log(t(t(sc_mat)/colSums(sc_mat)) * median_counts + 
+            1)
         K = length(unique(sc$cellType))
-        ratio_cell_increase=min(0.01*K, 0.1)
-        # bulk normalization
+        ratio_cell_increase = min(0.01 * K, 0.1)
         bulk_mat = exprs(bulk)
-        bulk_mat_norm = log(t(t(bulk_mat) / colSums(bulk_mat))*median_counts + 1)
+        bulk_mat_norm = log(t(t(bulk_mat)/colSums(bulk_mat)) * 
+            median_counts + 1)
         N = dim(bulk_mat_norm)[2]
-        # gene intersection 
         inter.genes = intersect(rownames(sc_mat_norm), rownames(bulk_mat_norm))
-        sc_mat_norm = sc_mat_norm[inter.genes,] ; sc = sc[inter.genes,]
-        bulk_mat_norm = bulk_mat_norm[inter.genes,] ; bulk = bulk[inter.genes,]
-        # compute average expression
-        sc_mat_avg = aggregate(t(sc_mat_norm), list(sc$cellType), mean)
+        sc_mat_norm = sc_mat_norm[inter.genes, ]
+        sc = sc[inter.genes, ]
+        bulk_mat_norm = bulk_mat_norm[inter.genes, ]
+        bulk = bulk[inter.genes, ]
+        sc_mat_avg = aggregate(t(sc_mat_norm), list(sc$cellType), 
+            mean)
         celltypes = levels(sc$cellType)
         celltypes = reformat_celltypes(celltypes)
-        rownames(sc_mat_avg) = sc_mat_avg$`Group.1`
+        rownames(sc_mat_avg) = sc_mat_avg$Group.1
         rownames(sc_mat_avg) = reformat_celltypes(rownames(sc_mat_avg))
-        sc_mat_avg = sc_mat_avg[,-1]
-        sc_mat_avg = sc_mat_avg[as.character(celltypes),]
+        sc_mat_avg = sc_mat_avg[, -1]
+        sc_mat_avg = sc_mat_avg[as.character(celltypes), ]
         sel.genes = apply(as.matrix(sc_mat_avg), 2, sd) != 0
-        sc_mat_avg = sc_mat_avg[,sel.genes]
-        bulk_mat_norm = bulk_mat_norm[sel.genes,]
-        sc_mat_norm = sc_mat_norm[sel.genes,]
-        bulk = bulk[sel.genes,]
-        sc = sc[sel.genes,]
+        sc_mat_avg = sc_mat_avg[, sel.genes]
+        bulk_mat_norm = bulk_mat_norm[sel.genes, ]
+        sc_mat_norm = sc_mat_norm[sel.genes, ]
+        bulk = bulk[sel.genes, ]
+        sc = sc[sel.genes, ]
         all(rownames(sc_mat_avg) == celltypes)
-        fc_to_average = t(sc_mat_avg) / colMeans(sc_mat_avg)
+        fc_to_average = t(sc_mat_avg)/colMeans(sc_mat_avg)
         fc_to_second_l = list()
-        for(c in 1:ncol(sc_mat_avg)){
-            col_c = sc_mat_avg[,c]
-            if (col_c[order(-col_c)][2] > 0){
-                fc_to_second_l[[c]] = col_c / col_c[order(-col_c)][2]
-            } else {
-                fc_to_second_l[[c]] = col_c*0.0000001
+        for (c in 1:ncol(sc_mat_avg)) {
+            col_c = sc_mat_avg[, c]
+            if (col_c[order(-col_c)][2] > 0) {
+                fc_to_second_l[[c]] = col_c/col_c[order(-col_c)][2]
+            }
+            else {
+                fc_to_second_l[[c]] = col_c * 1e-07
             }
         }
         fc_to_second = do.call(rbind, fc_to_second_l)
-        double_condition_matrix = fc_to_average > num(quantile(flatten(fc_to_average), p=0.95)) & fc_to_second > num(quantile(flatten(fc_to_average), p=0.75))
-        double_condition_matrix = double_condition_matrix[rowSums(double_condition_matrix) > 0,]
-        celltype_counts = matrix(0, ncol=K, nrow=1)
+        double_condition_matrix = fc_to_average > num(quantile(flatten(fc_to_average), 
+            p = 0.95)) & fc_to_second > num(quantile(flatten(fc_to_average), 
+            p = 0.75))
+        double_condition_matrix = double_condition_matrix[rowSums(double_condition_matrix) > 
+            0, ]
+        celltype_counts = matrix(0, ncol = K, nrow = 1)
         list_genes = list()
-        r_=1
-        for(r in 1:nrow(double_condition_matrix)){
-            row_ = double_condition_matrix[r,]
-            if (celltype_counts[1,which.max(row_)] <= 100){
-                celltype_counts[1,which.max(row_)] = celltype_counts[1,which.max(row_)]+1
+        r_ = 1
+        for (r in 1:nrow(double_condition_matrix)) {
+            row_ = double_condition_matrix[r, ]
+            if (celltype_counts[1, which.max(row_)] <= 100) {
+                celltype_counts[1, which.max(row_)] = celltype_counts[1, 
+                  which.max(row_)] + 1
                 list_genes[[r_]] = rownames(double_condition_matrix)[r]
-                r_ = r_+1
+                r_ = r_ + 1
             }
         }
         top_var = unique(unlist(list_genes))
         n_top_var = length(top_var)
-        # if not even variable genes, limit the number of top genes in bulks
-        if( (n_top_var/2) < n.top_mean.genes){
+        if ((n_top_var/2) < n.top_mean.genes) {
             n.top_mean.genes = round(n_top_var/2)
         }
-        sc_mat_norm_v = sc_mat_norm[top_var,]
-        bulk_mat_norm_v = bulk_mat_norm[top_var,]
-        sc_mat_avg_sub = sc_mat_avg[,top_var]
+        sc_mat_norm_v = sc_mat_norm[top_var, ]
+        bulk_mat_norm_v = bulk_mat_norm[top_var, ]
+        sc_mat_avg_sub = sc_mat_avg[, top_var]
         max_celltype_size = max(num(table(sc$cellType)))
-        if(max_celltype_size > max_size){ max_celltype_size <- max_size }
-        min.n.cells = min(min.n.cells, round(0.02*max_size))
+        if (max_celltype_size > max_size) {
+            max_celltype_size <- max_size
+        }
+        min.n.cells = min(min.n.cells, round(0.02 * max_size))
         ref.counts = table(sc$cellType)
         prior_proportions = final_res$props.init
-        for(q in 1:2){
+        for (q in 1:2) {
             ct.props = list()
-            for(n in 1:N){
-                top_means = -1*sort(-bulk_mat_norm_v[, n]*apply(sc_mat_avg_sub, 2, max))
+            for (n in 1:N) {
+                top_means = -1 * sort(-bulk_mat_norm_v[, n] * 
+                  apply(sc_mat_avg_sub, 2, max))
                 top_means = top_means[1:n.top_mean.genes]
                 gene_topExpr = rev(names(top_means))
-
-                sc_mat_norm_ = sc_mat_norm_v[gene_topExpr,]
-                bulk_mat_norm_ = bulk_mat_norm_v[gene_topExpr,]
+                sc_mat_norm_ = sc_mat_norm_v[gene_topExpr, ]
+                bulk_mat_norm_ = bulk_mat_norm_v[gene_topExpr, 
+                  ]
                 y = num(bulk_mat_norm_[, n])
-                
-                celltype_counts = matrix(prior_proportions[n,]*(max_size), nrow=1, ncol=K)
+                celltype_counts = matrix(prior_proportions[n, 
+                  ] * (max_size), nrow = 1, ncol = K)
                 colnames(celltype_counts) = colnames(prior_proportions)
-                celltype_counts[celltype_counts < min.n.cells] <- min.n.cells 
-                # Run deconvolution on 5 sub-sampled single-cell datasets
-                sum_props = matrix(0, nrow=1, ncol=K)
-                for(x in 1:n.iter.subsampling){
-                    # Sub-sampling cells from single-cell dataset
-                    all_samples = list()
-                    for(k in 1:length(celltypes)){
-                        ct = as.character(celltypes[k])
-                        set.seed(x*k)
-                        all_samples[[k]] = sample(grep(paste0('^',ct,'$'),sc$cellType), round(num(celltype_counts[,ct])), replace = T)
-                    }
-                    sample_ = unlist(all_samples)
-                    sc.sub = sc[gene_topExpr,sample_]
-                    scmat = sc_mat_norm_[,sample_]
-                    # Launch deconvolution
-                    fit = glmnet(scmat, y, lower.limits = 0, upper.limits = 0.001) 
-                    coefs = coef(fit)[-1, dim(coef(fit))[2]]
-
-                    agg = aggregate(coefs, list(sc.sub$cellType), sum, 
-                                    drop = F)
-                    agg$x[is.na(agg$x)] <- 0
-                    ppred = (agg$x)/sum(agg$x)
-                    names(ppred) = agg$Group.1
-                    sum_props = sum_props+ppred
+                celltype_counts[celltype_counts < min.n.cells] <- min.n.cells
+                sum_props = matrix(0, nrow = 1, ncol = K)
+                for (x in 1:n.iter.subsampling) {
+                  all_samples = list()
+                  for (k in 1:length(celltypes)) {
+                    ct = as.character(celltypes[k])
+                    set.seed(x * k)
+                    all_samples[[k]] = sample(grep(paste0("^", 
+                      ct, "$"), sc$cellType), round(num(celltype_counts[, 
+                      ct])), replace = T)
+                  }
+                  sample_ = unlist(all_samples)
+                  sc.sub = sc[gene_topExpr, sample_]
+                  scmat = sc_mat_norm_[, sample_]
+                  fit = glmnet(scmat, y, lower.limits = 0, upper.limits = 0.001)
+                  coefs = coef(fit)[-1, dim(coef(fit))[2]]
+                  agg = aggregate(coefs, list(sc.sub$cellType), 
+                    sum, drop = F)
+                  agg$x[is.na(agg$x)] <- 0
+                  ppred = (agg$x)/sum(agg$x)
+                  names(ppred) = agg$Group.1
+                  sum_props = sum_props + ppred
                 }
-                pred_prop = sum_props / rowSums(sum_props)
+                pred_prop = sum_props/rowSums(sum_props)
                 ct.props[[n]] = pred_prop
             }
-            climb_props.corrected = data.frame(do.call(rbind, ct.props))
+            climb_props.corrected = data.frame(do.call(rbind, 
+                ct.props))
             rownames(climb_props.corrected) = colnames(bulk)
             colnames(climb_props.corrected) = levels(sc$cellType)
             prior_proportions = climb_props.corrected
@@ -264,7 +273,9 @@ climb <- function (sc, bulk, mode = "abundance",
         final_res$props.corrected = data.frame(climb_props.corrected)
         weights_ = num(cor(table(sc$cellType), t(final_res$props.init)))
         weights_[weights_ < 0] <- 0
-        final_res$props.corrected = as.matrix(final_res$props.init) * num(weights_) + as.matrix(final_res$props.corrected) * (1 - num(weights_))
+        final_res$props.corrected = as.matrix(final_res$props.init) * 
+            num(weights_) + as.matrix(final_res$props.corrected) * 
+            (1 - num(weights_))
         rownames(final_res$props.corrected) = colnames(bulk)
         colnames(final_res$props.corrected) = levels(sc$cellType)
         if (verbose) {
