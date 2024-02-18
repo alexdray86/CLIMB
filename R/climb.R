@@ -296,9 +296,9 @@ climb <- function (sc, bulk, mode = "abundance", up.lim = Inf, lambda = 0,
             dimnames(S_pred_mapping_n)[[1]] = colnames(bulk)
             dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
             dimnames(S_pred_mapping_n)[[3]] = cellTypes
-            final_res$expr.highres = S_pred_mapping_n
-            final_res$expr.mapping = S_pred_mapping_n
-            final_res$expr.overall = colSums(S_pred_mapping_n, 
+            final_res$expr.highres = S_pred_mapping_norm
+            final_res$expr.mapping = S_pred_mapping_norm
+            final_res$expr.overall = colSums(S_pred_mapping_norm, 
                 dims = 1)
             final_res$coefs = save_coefs
         }
@@ -346,16 +346,16 @@ climb <- function (sc, bulk, mode = "abundance", up.lim = Inf, lambda = 0,
             dimnames(S_pred_n)[[2]] = dimnames(S_pred_mapping_n)[[2]] = rownames(bulk)
             dimnames(S_pred_n)[[3]] = dimnames(S_pred_mapping_n)[[3]] = cellTypes
             final_res$expr.highres = S_pred_n
-            final_res$expr.mapping = S_pred_mapping_n
-            final_res$expr.overall = colSums(S_pred_mapping_n, 
+            final_res$expr.mapping = S_pred_mapping_norm
+            final_res$expr.overall = colSums(S_pred_mapping_norm, 
                 dims = 1)
             final_res$coefs = save_coefs
         }
     }
     else {
-        final_res$expr.highres = S_pred_mapping_n
-        final_res$expr.mapping = S_pred_mapping_n
-        final_res$expr.overall = colSums(S_pred_mapping_n, dims = 1)
+        final_res$expr.highres = S_pred_mapping_norm
+        final_res$expr.mapping = S_pred_mapping_norm
+        final_res$expr.overall = colSums(S_pred_mapping_norm, dims = 1)
         final_res$coefs = save_coefs
     }
     return(final_res)
