@@ -16,6 +16,7 @@
 #' @param min.n.cells minimum number of cells per cell type to subsample. If a cell type has less cells in reference, then sampling is done with replacement.
 #' @param n.top_mean.genes number of genes used for bulk-specific gene selection.
 #' @export
+source("cliff.R")
 
 climb <- function (sc, bulk, mode = "abundance", up.lim = Inf, lambda = 0, 
     verbose = TRUE, cancer_pattern = "*", conditions = NA, final_res = list(), 
