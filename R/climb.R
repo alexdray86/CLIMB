@@ -15,8 +15,6 @@
 #' @param n.iter.subsampling number of subsampling that will be performed on the single-cell reference (results from each subsample are then averaged) 
 #' @param min.n.cells minimum number of cells per cell type to subsample. If a cell type has less cells in reference, then sampling is done with replacement.
 #' @param n.top_mean.genes number of genes used for bulk-specific gene selection.
-#' @export
-
 climb <- function (sc, bulk, mode = "abundance", up.lim = Inf, lambda = 0, 
     verbose = TRUE, cancer_pattern = "*", conditions = NA, final_res = list(), 
     min_common_genes = 100, ratio_cell_increase = 0.02, n.iter.subsampling = 5, 
@@ -360,8 +358,6 @@ climb <- function (sc, bulk, mode = "abundance", up.lim = Inf, lambda = 0,
     }
     return(final_res)
 }
-
-### CLIFF functions ### 
 sigmoid_ <- function(x, a){
     return( 1 / (1 + exp(-x + a)))
 }
@@ -544,4 +540,3 @@ cliff <- function (climb_output, drug_data, mutation_data = NULL, min.mutation =
     }
     return(list(PI_hat_nk, mutation_data, climb_prop))
 }
-
